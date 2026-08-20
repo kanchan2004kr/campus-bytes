@@ -1,0 +1,222 @@
+import type { FoodItem, Hostel, MenuCategory, Order, Restaurant } from '@campus-bytes/types';
+
+/**
+ * DEMO SEED DATA — for Phase 2 (Student Panel UI) only.
+ *
+ * This is intentionally the ONLY place demo content lives. In Phase 7 the data
+ * client (data/client.ts) is repointed at the real API and this file is dropped
+ * from the runtime path (it mirrors the DB seed). UI components never hardcode
+ * content — they always read through the client.
+ */
+
+const img = (id: string) =>
+  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=800&q=70`;
+
+export const HOSTELS: Hostel[] = [
+  { id: 'h-larimar', name: 'Larimar Hostel', zoneId: 'z-north' },
+  { id: 'h-vista', name: 'Vista Hostel', zoneId: 'z-north' },
+  { id: 'h-lg', name: 'LG Hostel', zoneId: 'z-south' },
+  { id: 'h-lp', name: 'LP Hostel', zoneId: 'z-south' },
+];
+
+export const RESTAURANTS: Restaurant[] = [
+  {
+    id: 'r-vista',
+    name: 'Vista Colline',
+    description: 'All-day chai, snacks & combos served hot near the north block.',
+    cuisine: 'Chai · Snacks · Combos',
+    logoUrl: null,
+    coverUrl: img('photo-1567620905732-2d1ec7ab7445'),
+    status: 'approved',
+    isOpen: true,
+    isPaused: false,
+    avgRating: 4.5,
+    ratingCount: 812,
+    prepTimeMin: 12,
+    deliveryAvailable: true,
+    crowdLevel: 'low',
+  },
+  {
+    id: 'r-legabriel',
+    name: 'Le Gabriel',
+    description: 'Comfort plates, biryani and cold beverages for late study nights.',
+    cuisine: 'Biryani · Beverages',
+    logoUrl: null,
+    coverUrl: img('photo-1563379091339-03b21ab4a4f8'),
+    status: 'approved',
+    isOpen: true,
+    isPaused: false,
+    avgRating: 3.4,
+    ratingCount: 305,
+    prepTimeMin: 18,
+    deliveryAvailable: true,
+    crowdLevel: 'medium',
+  },
+  {
+    id: 'r-365',
+    name: '365',
+    description: 'Quick bites, Maggie and paneer rolls — open around the clock.',
+    cuisine: 'Maggie · Paneer · Rolls',
+    logoUrl: null,
+    coverUrl: img('photo-1585032226651-759b368d7246'),
+    status: 'approved',
+    isOpen: true,
+    isPaused: false,
+    avgRating: 4.5,
+    ratingCount: 1290,
+    prepTimeMin: 9,
+    deliveryAvailable: true,
+    crowdLevel: 'low',
+  },
+  {
+    id: 'r-lapopote',
+    name: 'La Popote',
+    description: 'Homestyle North-Indian — parathas, chole and thalis.',
+    cuisine: 'Aloo Paratha · Chole · Thali',
+    logoUrl: null,
+    coverUrl: img('photo-1601050690597-df0568f70950'),
+    status: 'approved',
+    isOpen: false,
+    isPaused: true,
+    avgRating: 2.2,
+    ratingCount: 88,
+    prepTimeMin: 22,
+    deliveryAvailable: false,
+    crowdLevel: 'high',
+  },
+];
+
+export const CATEGORIES: MenuCategory[] = [
+  { id: 'c-vista-hot', restaurantId: 'r-vista', name: 'Hot & Fresh', sortOrder: 1 },
+  { id: 'c-vista-bev', restaurantId: 'r-vista', name: 'Beverages', sortOrder: 2 },
+  { id: 'c-vista-combo', restaurantId: 'r-vista', name: 'Combos', sortOrder: 3 },
+];
+
+export const FOOD_ITEMS: FoodItem[] = [
+  {
+    id: 'f-maggie',
+    restaurantId: 'r-vista',
+    categoryId: 'c-vista-hot',
+    name: 'Masala Maggie',
+    description: 'Classic two-minute noodles tossed with veggies and house masala.',
+    price: 60,
+    isVeg: true,
+    imageUrl: img('photo-1612929633738-8fe44f7ec841'),
+    isAvailable: true,
+  },
+  {
+    id: 'f-aloo-paratha',
+    restaurantId: 'r-vista',
+    categoryId: 'c-vista-hot',
+    name: 'Aloo Paratha (2 pcs)',
+    description: 'Stuffed potato parathas with butter, curd and pickle.',
+    price: 80,
+    isVeg: true,
+    imageUrl: img('photo-1601050690597-df0568f70950'),
+    isAvailable: true,
+  },
+  {
+    id: 'f-paneer-roll',
+    restaurantId: 'r-vista',
+    categoryId: 'c-vista-hot',
+    name: 'Paneer Tikka Roll',
+    description: 'Smoky paneer tikka wrapped in a soft roomali with mint chutney.',
+    price: 110,
+    isVeg: true,
+    imageUrl: img('photo-1565299624946-b28f40a0ae38'),
+    isAvailable: true,
+  },
+  {
+    id: 'f-chai',
+    restaurantId: 'r-vista',
+    categoryId: 'c-vista-bev',
+    name: 'Masala Chai',
+    description: 'Slow-brewed cutting chai with ginger and cardamom.',
+    price: 20,
+    isVeg: true,
+    imageUrl: img('photo-1571934811356-5cc061b6821f'),
+    isAvailable: true,
+  },
+  {
+    id: 'f-cold-coffee',
+    restaurantId: 'r-vista',
+    categoryId: 'c-vista-bev',
+    name: 'Cold Coffee',
+    description: 'Thick blended cold coffee topped with chocolate.',
+    price: 90,
+    isVeg: true,
+    imageUrl: img('photo-1461023058943-07fcbe16d735'),
+    isAvailable: false,
+  },
+  {
+    id: 'f-combo-chole',
+    restaurantId: 'r-vista',
+    categoryId: 'c-vista-combo',
+    name: 'Chole Bhature Combo',
+    description: 'Two fluffy bhature with spiced chole, onions and a drink.',
+    price: 140,
+    isVeg: true,
+    imageUrl: img('photo-1626132647523-66f5bf380027'),
+    isAvailable: true,
+  },
+];
+
+const now = Date.now();
+const iso = (minsAgo: number) => new Date(now - minsAgo * 60000).toISOString();
+
+export const ORDERS: Order[] = [
+  {
+    id: 'o-1042',
+    code: 'CB1042',
+    studentId: 's-1',
+    restaurantId: 'r-legabriel',
+    restaurantName: 'Le Gabriel',
+    cartId: 'cart-03',
+    cartLabel: 'Campus Cart #03',
+    deliveryZoneId: 'z-north',
+    deliveryHostelName: 'Larimar Hostel',
+    deliveryRoomNo: '811',
+    status: 'out_for_delivery',
+    prepTimeMin: 15,
+    itemTotal: 178,
+    fees: 20,
+    grandTotal: 198,
+    paymentMethod: 'online',
+    paymentStatus: 'captured',
+    notes: 'Less spicy please',
+    rejectionReason: null,
+    items: [
+      { id: 'oi-1', foodItemId: 'x', nameSnapshot: 'Veg Biryani', priceSnapshot: 148, quantity: 1 },
+      { id: 'oi-2', foodItemId: 'y', nameSnapshot: 'Coke', priceSnapshot: 30, quantity: 1 },
+    ],
+    placedAt: iso(22),
+    updatedAt: iso(2),
+  },
+  {
+    id: 'o-1039',
+    code: 'CB1039',
+    studentId: 's-1',
+    restaurantId: 'r-365',
+    restaurantName: '365',
+    cartId: null,
+    cartLabel: null,
+    deliveryZoneId: 'z-north',
+    deliveryHostelName: 'Larimar Hostel',
+    deliveryRoomNo: '811',
+    status: 'delivered',
+    prepTimeMin: 10,
+    itemTotal: 150,
+    fees: 20,
+    grandTotal: 170,
+    paymentMethod: 'online',
+    paymentStatus: 'captured',
+    notes: null,
+    rejectionReason: null,
+    items: [
+      { id: 'oi-3', foodItemId: 'z', nameSnapshot: 'Masala Maggie', priceSnapshot: 60, quantity: 1 },
+      { id: 'oi-4', foodItemId: 'w', nameSnapshot: 'Paneer Roll', priceSnapshot: 90, quantity: 1 },
+    ],
+    placedAt: iso(1500),
+    updatedAt: iso(1470),
+  },
+];

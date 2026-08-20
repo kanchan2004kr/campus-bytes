@@ -1,0 +1,44 @@
+# Render Blueprint for the Campus Bytes NestJS backend (apps/api).
+# Secrets (sync: false) must be set in the Render dashboard — never commit values.
+# Uses the existing Neon database + existing migration history (migrate deploy is
+# additive and non-destructive; it never resets or drops data).
+services:
+  - type: web
+    name: campus-bytes-api
+    runtime: node
+    plan: free
+    rootDir: .
+    # Install the whole pnpm workspace, generate the Prisma client, and apply any
+    # pending migrations to Neon (safe production workflow — no reset/seed).
+    buildCommand: >-
+      corepack enable &&
+      pnpm install &&
+      pnpm --filter @campus-bytes/api exec prisma generate &&
+      pnpm --filter @campus-bytes/api exec prisma migrate deploy
+    startCommand: pnpm --filter @campus-bytes/api run start:prod
+    healthCheckPath: /api/v1/restaurants
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DEFAULT_TENANT_SUBDOMAIN
+        value: nims
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      - key: JWT_REFRESH_TTL
+        value: 7d
+      - key: RESEND_FROM_EMAIL
+        value: Campus Bytes <onboarding@resend.dev>
+      # ── Secrets — set these in the Render dashboard (do NOT commit values) ──
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      # Comma-separated allowed browser origins (your Vercel production URL).
+      - key: WEB_ORIGIN
+        sync: false

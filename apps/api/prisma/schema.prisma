@@ -1,0 +1,480 @@
+// Campus Bytes — PostgreSQL schema (PRD §13).
+// Multi-tenant via campusId on every tenant-scoped table. UUID PKs, FKs, indexes,
+// timestamps, enums, soft-delete where appropriate. OrderItem freezes a snapshot
+// of the food item so menu edits never mutate historical orders.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────── Enums ───────────────────────────
+enum UserRole {
+  student
+  restaurant
+  admin
+}
+
+enum UserStatus {
+  active
+  blocked
+}
+
+enum RestaurantStatus {
+  pending
+  approved
+  suspended
+}
+
+enum OrderStatus {
+  placed
+  accepted
+  preparing
+  ready
+  out_for_delivery
+  delivered
+  rejected
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  authorized
+  captured
+  failed
+  refunded
+}
+
+enum PaymentMethod {
+  online
+}
+
+enum CartStatus {
+  available
+  busy
+  offline
+}
+
+enum NotificationChannel {
+  in_app
+  email
+  sms
+}
+
+enum CrowdLevel {
+  low
+  medium
+  high
+}
+
+enum TicketRole {
+  student
+  restaurant
+}
+
+enum TicketStatus {
+  open
+  resolved
+}
+
+// ─────────────────────────── Tenant ───────────────────────────
+model Campus {
+  id        String   @id @default(uuid())
+  name      String
+  subdomain String   @unique
+  settings  Json     @default("{}")
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  restaurants  Restaurant[]
+  hostels      Hostel[]
+  zones        CampusZone[]
+  carts        FoodCart[]
+  orders       Order[]
+  auditLogs    AuditLog[]
+  notifications Notification[]
+  tickets      SupportTicket[]
+
+  @@map("campus")
+}
+
+// ─────────────────────────── Users ───────────────────────────
+model User {
+  id           String     @id @default(uuid())
+  campusId     String
+  role         UserRole
+  name         String
+  email        String
+  phone        String?
+  passwordHash String? // restaurant/admin only
+  status       UserStatus @default(active)
+
+  // student profile fields
+  studentId String? // university student ID (students only)
+  course    String? // course / program (students only)
+  hostelId  String?
+  roomId    String?
+  verified  Boolean @default(false) // email verified via OTP
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  campus           Campus         @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  hostel           Hostel?        @relation(fields: [hostelId], references: [id])
+  room             Room?          @relation(fields: [roomId], references: [id])
+  ownedRestaurant  Restaurant?    @relation("RestaurantOwner")
+  approvedRestaurants Restaurant[] @relation("RestaurantApprover")
+  orders           Order[]
+  ratings          Rating[]
+  otpCodes         OtpCode[]
+  refreshTokens    RefreshToken[]
+  notifications    Notification[]
+  statusChanges    OrderStatusHistory[]
+
+  @@unique([campusId, email, role])
+  @@unique([campusId, studentId])
+  @@index([campusId, role])
+  @@index([campusId, status])
+  @@map("app_user")
+}
+
+model OtpCode {
+  id         String   @id @default(uuid())
+  userId     String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int      @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("otp_code")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_token")
+}
+
+// ─────────────────────────── Restaurant ───────────────────────────
+model Restaurant {
+  id                String           @id @default(uuid())
+  campusId          String
+  ownerUserId       String?          @unique
+  name              String
+  description       String?
+  cuisine           String?
+  logoUrl           String?
+  coverUrl          String?
+  status            RestaurantStatus @default(pending)
+  isPaused          Boolean          @default(false)
+  prepTimeMin       Int              @default(15)
+  deliveryAvailable Boolean          @default(true)
+  crowdLevel        CrowdLevel       @default(low)
+  avgRating         Float            @default(0)
+  ratingCount       Int              @default(0)
+  approvedByUserId  String?
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  campus     Campus         @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  owner      User?          @relation("RestaurantOwner", fields: [ownerUserId], references: [id])
+  approvedBy User?          @relation("RestaurantApprover", fields: [approvedByUserId], references: [id])
+  categories MenuCategory[]
+  foodItems  FoodItem[]
+  orders     Order[]
+  ratings    Rating[]
+
+  @@index([campusId, status])
+  @@map("restaurant")
+}
+
+model MenuCategory {
+  id           String @id @default(uuid())
+  restaurantId String
+  name         String
+  sortOrder    Int    @default(0)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  foodItems  FoodItem[]
+
+  @@index([restaurantId])
+  @@map("menu_category")
+}
+
+model FoodItem {
+  id           String  @id @default(uuid())
+  restaurantId String
+  categoryId   String
+  name         String
+  description  String?
+  price        Decimal @db.Decimal(10, 2)
+  isVeg        Boolean @default(true)
+  imageUrl     String?
+  isAvailable  Boolean @default(true)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([restaurantId, isAvailable])
+  @@index([categoryId])
+  @@map("food_item")
+}
+
+// ─────────────────────────── Location ───────────────────────────
+model Hostel {
+  id       String  @id @default(uuid())
+  campusId String
+  name     String
+  zoneId   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campus Campus      @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  zone   CampusZone? @relation(fields: [zoneId], references: [id])
+  rooms  Room[]
+  users  User[]
+
+  @@index([campusId])
+  @@map("hostel")
+}
+
+model Room {
+  id       String @id @default(uuid())
+  hostelId String
+  roomNo   String
+
+  createdAt DateTime @default(now())
+
+  hostel Hostel @relation(fields: [hostelId], references: [id], onDelete: Cascade)
+  users  User[]
+
+  @@unique([hostelId, roomNo])
+  @@index([hostelId])
+  @@map("room")
+}
+
+model CampusZone {
+  id            String  @id @default(uuid())
+  campusId      String
+  name          String
+  isPickupPoint Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  campus  Campus     @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  hostels Hostel[]
+  carts   FoodCart[]
+  orders  Order[]
+
+  @@index([campusId])
+  @@map("campus_zone")
+}
+
+// ─────────────────────── Food carts (resource, NOT a user) ───────────────────────
+model FoodCart {
+  id            String     @id @default(uuid())
+  campusId      String
+  label         String
+  status        CartStatus @default(available)
+  currentZoneId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campus      Campus      @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  currentZone CampusZone? @relation(fields: [currentZoneId], references: [id])
+  orders      Order[]
+
+  @@index([campusId, status])
+  @@map("food_cart")
+}
+
+// ─────────────────────────── Orders ───────────────────────────
+model Order {
+  id              String        @id @default(uuid())
+  campusId        String
+  code            String
+  studentId       String
+  restaurantId    String
+  cartId          String?
+  deliveryZoneId  String?
+  deliveryHostelName String?
+  deliveryRoomNo  String?
+  status          OrderStatus   @default(placed)
+  prepTimeMin     Int?
+  itemTotal       Decimal       @db.Decimal(10, 2)
+  fees            Decimal       @db.Decimal(10, 2) @default(0)
+  grandTotal      Decimal       @db.Decimal(10, 2)
+  paymentMethod   PaymentMethod @default(online)
+  notes           String?
+  rejectionReason String?
+  placedAt        DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  campus       Campus               @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  student      User                 @relation(fields: [studentId], references: [id])
+  restaurant   Restaurant           @relation(fields: [restaurantId], references: [id])
+  cart         FoodCart?            @relation(fields: [cartId], references: [id])
+  deliveryZone CampusZone?          @relation(fields: [deliveryZoneId], references: [id])
+  items        OrderItem[]
+  statusHistory OrderStatusHistory[]
+  payment      Payment?
+  rating       Rating?
+
+  @@unique([campusId, code])
+  @@index([campusId, status])
+  @@index([restaurantId, status])
+  @@index([studentId])
+  @@map("order")
+}
+
+model OrderItem {
+  id            String  @id @default(uuid())
+  orderId       String
+  foodItemId    String?
+  nameSnapshot  String
+  priceSnapshot Decimal @db.Decimal(10, 2)
+  isVegSnapshot Boolean @default(true)
+  quantity      Int
+
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  foodItem FoodItem? @relation(fields: [foodItemId], references: [id])
+
+  @@index([orderId])
+  @@map("order_item")
+}
+
+model OrderStatusHistory {
+  id            String      @id @default(uuid())
+  orderId       String
+  status        OrderStatus
+  changedByRole String // student | restaurant | admin | system
+  changedById   String?
+  changedAt     DateTime    @default(now())
+
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedBy User? @relation(fields: [changedById], references: [id])
+
+  @@index([orderId])
+  @@map("order_status_history")
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  orderId        String        @unique
+  provider       String        @default("razorpay")
+  providerRef    String?
+  amount         Decimal       @db.Decimal(10, 2)
+  method         String        @default("online")
+  status         PaymentStatus @default(pending)
+  idempotencyKey String        @unique
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("payment")
+}
+
+model Rating {
+  id           String   @id @default(uuid())
+  orderId      String   @unique
+  studentId    String
+  restaurantId String
+  score        Int
+  review       String?
+  createdAt    DateTime @default(now())
+
+  order      Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  student    User       @relation(fields: [studentId], references: [id])
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@index([restaurantId])
+  @@map("rating")
+}
+
+// ─────────────────────────── Notifications / Support / Audit ───────────────────────────
+model Notification {
+  id       String              @id @default(uuid())
+  campusId String
+  userId   String?
+  channel  NotificationChannel @default(in_app)
+  type     String
+  title    String
+  body     String?
+  payload  Json                @default("{}")
+  readAt   DateTime?
+  createdAt DateTime           @default(now())
+
+  campus Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notification")
+}
+
+model SupportTicket {
+  id       String       @id @default(uuid())
+  campusId String
+  code     String
+  fromName String
+  role     TicketRole
+  subject  String
+  status   TicketStatus @default(open)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  campus Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
+
+  @@index([campusId, status])
+  @@map("support_ticket")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  campusId    String
+  actorUserId String?
+  actorLabel  String
+  action      String
+  target      String
+  meta        Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  campus Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
+
+  @@index([campusId])
+  @@map("audit_log")
+}

@@ -1,0 +1,197 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
+import { UserRole } from '@campus-bytes/types';
+import { PrismaService } from '../../prisma/prisma.service';
+import { TenantService } from '../tenant/tenant.service';
+import { OtpService } from './otp.service';
+import { TokenService } from './token.service';
+import type { AuthUser } from '../../common/auth/auth.types';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenant: TenantService,
+    private readonly otp: OtpService,
+    private readonly tokens: TokenService,
+  ) {}
+
+  // ── Student: signup (Student ID + Course + Email) ───────────────────
+  async studentSignup(input: { studentId: string; course: string; email: string }) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const email = input.email.toLowerCase().trim();
+    const studentId = input.studentId.trim();
+    const course = input.course.trim();
+
+    // Email already registered & verified → they should log in instead.
+    const byEmail = await this.prisma.user.findFirst({
+      where: { campusId, email, role: UserRole.STUDENT },
+    });
+    if (byEmail?.verified) {
+      throw new ConflictException('This email is already registered. Please log in instead.');
+    }
+
+    // Student ID taken by a different (verified) account.
+    const byStudentId = await this.prisma.user.findFirst({
+      where: { campusId, studentId, role: UserRole.STUDENT },
+    });
+    if (byStudentId && byStudentId.email !== email) {
+      throw new ConflictException('This Student ID is already registered.');
+    }
+
+    // Create or resume an unverified signup for this email.
+    const name = email.split('@')[0] || 'Student';
+    const user = byEmail
+      ? await this.prisma.user.update({
+          where: { id: byEmail.id },
+          data: { studentId, course, name },
+        })
+      : await this.prisma.user.create({
+          data: { campusId, email, role: UserRole.STUDENT, studentId, course, name },
+        });
+
+    await this.otp.issue(user.id, email, name);
+    return { sent: true, email };
+  }
+
+  // ── Student: login (request OTP by email or Student ID) ─────────────
+  async studentRequestOtp(identifier: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const id = identifier.trim();
+    const user = id.includes('@')
+      ? await this.prisma.user.findFirst({ where: { campusId, email: id.toLowerCase(), role: UserRole.STUDENT } })
+      : await this.prisma.user.findFirst({ where: { campusId, studentId: id, role: UserRole.STUDENT } });
+
+    if (!user) throw new NotFoundException('No account found. Please sign up first.');
+    if (user.status === 'blocked') throw new UnauthorizedException('Your account has been blocked.');
+
+    await this.otp.issue(user.id, user.email, user.name);
+    return { sent: true, email: user.email };
+  }
+
+  /** Resend works for both a pending signup and a login by the same email. */
+  async studentResendOtp(email: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const normalized = email.toLowerCase().trim();
+    const user = await this.prisma.user.findFirst({
+      where: { campusId, email: normalized, role: UserRole.STUDENT },
+    });
+    if (!user) throw new NotFoundException('No pending verification for this email.');
+    if (user.status === 'blocked') throw new UnauthorizedException('Your account has been blocked.');
+
+    await this.otp.issue(user.id, user.email, user.name);
+    return { sent: true, email: user.email };
+  }
+
+  async studentVerifyOtp(email: string, code: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const normalized = email.toLowerCase().trim();
+    const user = await this.prisma.user.findFirst({
+      where: { campusId, email: normalized, role: UserRole.STUDENT },
+    });
+    if (!user) throw new BadRequestException('No account for this email. Please sign up.');
+    if (user.status === 'blocked') throw new UnauthorizedException('Your account has been blocked.');
+
+    await this.otp.verify(user.id, code);
+    if (!user.verified) {
+      await this.prisma.user.update({ where: { id: user.id }, data: { verified: true } });
+    }
+    return this.issueSession({ sub: user.id, role: UserRole.STUDENT, campusId });
+  }
+
+  // ── Restaurant / Admin: password ────────────────────────────────────
+  async passwordLogin(email: string, password: string, role: UserRole) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const normalized = email.toLowerCase().trim();
+    const user = await this.prisma.user.findFirst({
+      where: { campusId, email: normalized, role },
+    });
+    if (!user || !user.passwordHash) throw new UnauthorizedException('Invalid credentials');
+    if (user.status === 'blocked') throw new UnauthorizedException('Account blocked');
+
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) throw new UnauthorizedException('Invalid credentials');
+
+    const restaurant =
+      role === UserRole.RESTAURANT
+        ? await this.prisma.restaurant.findUnique({ where: { ownerUserId: user.id } })
+        : null;
+
+    return this.issueSession({
+      sub: user.id,
+      role,
+      campusId,
+      ...(restaurant ? { restaurantId: restaurant.id } : {}),
+    });
+  }
+
+  async refresh(refreshToken: string) {
+    const userId = await this.tokens.userIdFromRefresh(refreshToken);
+    if (!userId) throw new UnauthorizedException('Invalid refresh token');
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('Invalid refresh token');
+    const restaurant =
+      user.role === UserRole.RESTAURANT
+        ? await this.prisma.restaurant.findUnique({ where: { ownerUserId: user.id } })
+        : null;
+    const principal: AuthUser = {
+      sub: user.id,
+      role: user.role as UserRole,
+      campusId: user.campusId,
+      ...(restaurant ? { restaurantId: restaurant.id } : {}),
+    };
+    const pair = await this.tokens.rotate(refreshToken, principal);
+    return { ...pair, user: this.publicUser(user) };
+  }
+
+  async logout(userId: string): Promise<{ ok: true }> {
+    await this.tokens.revokeAll(userId);
+    return { ok: true };
+  }
+
+  async me(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { hostel: true, room: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return this.publicUser(user);
+  }
+
+  // ── helpers ─────────────────────────────────────────────────────────
+  private async issueSession(principal: AuthUser) {
+    const pair = await this.tokens.issue(principal);
+    const user = await this.prisma.user.findUnique({ where: { id: principal.sub } });
+    return { ...pair, user: this.publicUser(user!) };
+  }
+
+  private publicUser(u: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    role: string;
+    status: string;
+    hostelId: string | null;
+    roomId: string | null;
+    verified: boolean;
+  }) {
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone,
+      role: u.role,
+      status: u.status,
+      hostelId: u.hostelId,
+      roomId: u.roomId,
+      verified: u.verified,
+    };
+  }
+}

@@ -1,0 +1,85 @@
+/**
+ * Campus Bytes — design tokens (CSS custom properties).
+ * Imported once at the app root. The Tailwind preset maps utilities to these vars.
+ */
+
+:root {
+  /* Brand — warm coral-orange */
+  --brand-50: #fff3ee;
+  --brand-100: #ffe3d6;
+  --brand-200: #ffc7ad;
+  --brand-300: #ffa480;
+  --brand-400: #ff7d4f;
+  --brand-500: #ff6a3d;
+  --brand-600: #f0562d;
+  --brand-700: #c7431f;
+  --brand-fg: #ffffff;
+
+  /* Surfaces — warm neutrals */
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-cream: #fff7f0;
+  --surface-peach: #fdece2;
+  --surface-raised: #ffffff;
+
+  /* Ink (text) — charcoal */
+  --ink-900: #1f1b18;
+  --ink-700: #3d3630;
+  --ink-600: #5b534e;
+  --ink-400: #9a918b;
+
+  /* Borders */
+  --border: #efe7df;
+  --border-strong: #e2d6ca;
+
+  /* Semantic status */
+  --success: #1e9e6a;
+  --success-fg: #ffffff;
+  --success-soft: #e5f5ee;
+  --warning: #e7a008;
+  --warning-fg: #3d2c00;
+  --warning-soft: #fdf1d8;
+  --error: #e23d3d;
+  --error-fg: #ffffff;
+  --error-soft: #fdeaea;
+  --info: #2f6fed;
+  --info-fg: #ffffff;
+  --info-soft: #e9f0fe;
+
+  /* Focus ring */
+  --ring: rgba(240, 86, 45, 0.35);
+
+  /* Typography */
+  --font-display: 'Clash Display', 'Satoshi', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--ink-900);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Respect reduced-motion preference across the app */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Consistent focus-visible ring */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+  border-radius: 0.5rem;
+}

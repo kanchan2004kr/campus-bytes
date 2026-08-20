@@ -1,0 +1,15 @@
+{
+  "name": "@campus-bytes/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    "./tailwind": "./tailwind-preset.js",
+    "./tsconfig.base.json": "./tsconfig.base.json"
+  },
+  "files": [
+    "tailwind-preset.js",
+    "tsconfig.base.json"
+  ]
+}
