@@ -67,7 +67,7 @@ function LoginInner() {
           )}
         </div>
 
-        {mode !== 'student' && (
+        {mode !== 'student' && process.env.NODE_ENV !== 'production' && (
           <p className="mt-4 text-center text-2xs text-ink-400">
             {mode === 'restaurant'
               ? 'Dev: owner@vistacolline.dev / Owner@12345'
