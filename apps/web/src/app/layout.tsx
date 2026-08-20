@@ -16,13 +16,37 @@ const bricolage = Bricolage_Grotesque({
   weight: ['500', '600', '700'],
 });
 
+const siteUrl = 'https://campusbytes.college';
+const siteDescription =
+  'Campus Bytes is a campus-exclusive food ordering platform. Order from your favourite campus outlets and get it delivered by university carts.';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
     default: 'Campus Bytes — Skip the queue. Eat from your room.',
     template: '%s · Campus Bytes',
   },
-  description:
-    'Campus Bytes is a campus-exclusive food ordering platform. Order from your favourite campus outlets and get it delivered by university carts.',
+  description: siteDescription,
+  applicationName: 'Campus Bytes',
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    type: 'website',
+    url: siteUrl,
+    siteName: 'Campus Bytes',
+    title: 'Campus Bytes — Skip the queue. Eat from your room.',
+    description: siteDescription,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Campus Bytes — Skip the queue. Eat from your room.',
+    description: siteDescription,
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
   icons: {
     icon: '/favicon.svg',
   },
