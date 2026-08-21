@@ -13,16 +13,19 @@ import { getOrder } from '@/data/client';
 import { formatCurrency, formatTime } from '@/lib/format';
 import { OrderTimeline } from '@/components/student/order-timeline';
 import { CartTracker } from '@/components/student/cart-tracker';
+import { useOrderRealtime } from '@/lib/realtime';
 
 export default function OrderTrackingPage({ params }: { params: { id: string } }) {
   const { id } = params;
+  // Instant status updates over the authenticated socket (student only receives
+  // their own order events). A 20s poll remains as a reconnect fallback.
+  useOrderRealtime([['order', id], ['orders']]);
   const { data: o, isLoading, isError, refetch } = useQuery({
     queryKey: ['order', id],
     queryFn: () => getOrder(id),
-    // Live-ish: poll while the order is active (WebSocket replaces this in Phase 11).
     refetchInterval: (q) => {
       const s = q.state.data?.status;
-      return s && !isTerminal(s) ? 8000 : false;
+      return s && !isTerminal(s) ? 20000 : false;
     },
   });
 

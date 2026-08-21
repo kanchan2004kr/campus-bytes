@@ -24,13 +24,13 @@ export class RealtimeService {
 
   constructor(private readonly gateway: RealtimeGateway) {}
 
-  /** Emit an order lifecycle event to the student, its restaurant, and admins. */
+  /** Emit an order lifecycle event to the owning student, its restaurant, and admins. */
   emitOrderEvent(
     event: OrderEvent,
-    order: { id: string; restaurantId: string; code: string; status: string },
+    order: { id: string; restaurantId: string; studentId: string; code: string; status: string },
   ): void {
     const payload = { event, orderId: order.id, code: order.code, status: order.status };
-    this.gateway.emitToOrder(order.id, event, payload);
+    this.gateway.emitToStudent(order.studentId, event, payload);
     this.gateway.emitToRestaurant(order.restaurantId, event, payload);
     this.gateway.emitToAdmin(event, payload);
     this.logger.debug(`${event} · order ${order.code}`);

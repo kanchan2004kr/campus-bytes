@@ -131,10 +131,31 @@ export function OrderCard({ order }: { order: RestaurantOrder }) {
             <li key={i} className="flex items-center gap-2 text-sm">
               <VegMark isVeg={it.isVeg} />
               <span className="font-medium text-ink-900">{it.quantity}×</span>
-              <span className="text-ink-700">{it.name}</span>
+              <span className="flex-1 text-ink-700">{it.name}</span>
+              <span className="tabular-nums text-ink-500">{formatCurrency(it.price)}</span>
+              <span className="w-14 text-right font-medium tabular-nums text-ink-900">
+                {formatCurrency(it.price * it.quantity)}
+              </span>
             </li>
           ))}
         </ul>
+
+        <div className="space-y-1 border-t border-dashed border-line pt-2 text-xs">
+          <div className="flex justify-between text-ink-500">
+            <span>Subtotal</span>
+            <span className="tabular-nums">{formatCurrency(order.itemTotal)}</span>
+          </div>
+          {order.fees ? (
+            <div className="flex justify-between text-ink-500">
+              <span>Delivery fee</span>
+              <span className="tabular-nums">{formatCurrency(order.fees)}</span>
+            </div>
+          ) : null}
+          <div className="flex justify-between pt-0.5 text-sm font-semibold text-ink-900">
+            <span>Total</span>
+            <span className="tabular-nums">{formatCurrency(order.grandTotal ?? order.itemTotal)}</span>
+          </div>
+        </div>
 
         {order.notes && (
           <div className="flex items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-fg">

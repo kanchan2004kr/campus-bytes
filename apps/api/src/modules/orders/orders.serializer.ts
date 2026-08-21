@@ -34,6 +34,43 @@ export function toOrder(o: any): Order {
   };
 }
 
+/**
+ * Restaurant-facing order shape: fully populated so staff see WHAT to make and
+ * WHERE to deliver without opening another page. Item names/prices/veg come from
+ * the frozen OrderItem snapshot; delivery + student from the order relations.
+ */
+export function toRestaurantOrder(o: any) {
+  return {
+    id: o.id,
+    code: o.code,
+    studentName: o.student?.name ?? 'Student',
+    studentId2: o.student?.studentId ?? null,
+    hostelName: o.deliveryHostelName ?? o.deliveryLocationName ?? '',
+    roomNo: o.deliveryRoomNo ?? '',
+    deliveryType: o.deliveryType ?? null,
+    deliveryLocationName: o.deliveryLocationName ?? o.deliveryHostelName ?? null,
+    deliveryRoomNo: o.deliveryRoomNo ?? null,
+    deliveryInstructions: o.deliveryInstructions ?? null,
+    items: (o.items ?? []).map((i: any) => ({
+      name: i.nameSnapshot,
+      quantity: i.quantity,
+      price: dec(i.priceSnapshot),
+      isVeg: i.isVegSnapshot,
+    })),
+    itemTotal: dec(o.itemTotal),
+    fees: dec(o.fees),
+    grandTotal: dec(o.grandTotal),
+    notes: o.notes ?? null,
+    status: o.status,
+    prepTimeMin: o.prepTimeMin ?? null,
+    rejectionReason: o.rejectionReason ?? null,
+    cartId: o.cartId ?? null,
+    cartLabel: o.cart?.label ?? null,
+    placedAt: o.placedAt instanceof Date ? o.placedAt.toISOString() : o.placedAt,
+    acceptedAt: null as string | null,
+  };
+}
+
 export function toOrderItem(i: any): OrderItem {
   return {
     id: i.id,

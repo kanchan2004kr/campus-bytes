@@ -5,16 +5,22 @@ import { OrderStatus } from '@campus-bytes/types';
 import { useEffect, useRef } from 'react';
 import { toast } from '@campus-bytes/ui';
 import { getLiveOrders } from '@/data/restaurant';
+import { useOrderRealtime } from '@/lib/realtime';
 
 /**
  * Watches live orders and fires a chime + toast when a new PLACED order arrives.
- * Uses polling now; swaps to the WebSocket `new_order` event in Phase 11.
+ * Realtime: a Socket.IO ORDER_* event instantly refetches the live-orders query;
+ * the 20s poll is only a reconnect fallback.
  */
 export function NewOrderWatcher() {
+  // Instant updates over the authenticated socket (restaurant only receives its
+  // own restaurant's events). Refetch on any order event.
+  useOrderRealtime([['r-orders']]);
+
   const { data } = useQuery({
     queryKey: ['r-orders'],
     queryFn: getLiveOrders,
-    refetchInterval: 5000,
+    refetchInterval: 20000,
   });
   const seen = useRef<Set<string> | null>(null);
 

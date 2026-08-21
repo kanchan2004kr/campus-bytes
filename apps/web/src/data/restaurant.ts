@@ -46,6 +46,8 @@ export interface RestaurantOrder {
   deliveryInstructions?: string | null;
   items: RestaurantOrderItem[];
   itemTotal: number;
+  fees?: number;
+  grandTotal?: number;
   notes: string | null;
   status: OrderStatus;
   prepTimeMin: number | null;

@@ -17,7 +17,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantService } from '../tenant/tenant.service';
 import { RealtimeService, ORDER_EVENTS, type OrderEvent } from '../realtime/realtime.service';
-import { ORDER_INCLUDE, toOrder } from './orders.serializer';
+import { ORDER_INCLUDE, toOrder, toRestaurantOrder } from './orders.serializer';
 import type { AuthUser } from '../../common/auth/auth.types';
 import type { AcceptOrderDto, CreateOrderDto, RejectOrderDto } from './dto/orders.dto';
 
@@ -193,7 +193,7 @@ export class OrdersService {
       include: ORDER_INCLUDE,
       orderBy: { placedAt: 'asc' },
     });
-    return orders.map(toOrder);
+    return orders.map(toRestaurantOrder);
   }
 
   async history(restaurantId: string) {
@@ -202,7 +202,7 @@ export class OrdersService {
       include: ORDER_INCLUDE,
       orderBy: { placedAt: 'desc' },
     });
-    return orders.map(toOrder);
+    return orders.map(toRestaurantOrder);
   }
 
   async accept(restaurantId: string, orderId: string, dto: AcceptOrderDto, user: AuthUser) {
@@ -350,7 +350,10 @@ export class OrdersService {
     });
   }
 
-  private emit(order: { id: string; restaurantId: string; code: string; status: string }, event: OrderEvent) {
+  private emit(
+    order: { id: string; restaurantId: string; studentId: string; code: string; status: string },
+    event: OrderEvent,
+  ) {
     this.realtime.emitOrderEvent(event, order);
   }
 
