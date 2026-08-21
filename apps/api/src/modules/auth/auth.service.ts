@@ -23,12 +23,19 @@ export class AuthService {
   ) {}
 
   // ── Student: signup (Student ID + Course + Email) ───────────────────
-  async studentSignup(input: { name: string; studentId: string; course: string; email: string }) {
+  async studentSignup(input: {
+    name: string;
+    studentId: string;
+    course: string;
+    email: string;
+    password: string;
+  }) {
     const campusId = await this.tenant.getDefaultCampusId();
     const email = input.email.toLowerCase().trim();
     const studentId = input.studentId.trim();
     const course = input.course.trim();
     const fullName = input.name.trim();
+    const passwordHash = await bcrypt.hash(input.password, 10);
 
     // Email already registered & verified → they should log in instead.
     const byEmail = await this.prisma.user.findFirst({
@@ -52,10 +59,10 @@ export class AuthService {
     const user = byEmail
       ? await this.prisma.user.update({
           where: { id: byEmail.id },
-          data: { studentId, course, name },
+          data: { studentId, course, name, passwordHash },
         })
       : await this.prisma.user.create({
-          data: { campusId, email, role: UserRole.STUDENT, studentId, course, name },
+          data: { campusId, email, role: UserRole.STUDENT, studentId, course, name, passwordHash },
         });
 
     await this.otp.issue(user.id, email, name);
@@ -105,6 +112,58 @@ export class AuthService {
       await this.prisma.user.update({ where: { id: user.id }, data: { verified: true } });
     }
     return this.issueSession({ sub: user.id, role: UserRole.STUDENT, campusId });
+  }
+
+  // ── Student: password login (email or Student ID) ───────────────────
+  async studentLogin(identifier: string, password: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const id = identifier.trim();
+    const user = id.includes('@')
+      ? await this.prisma.user.findFirst({
+          where: { campusId, email: id.toLowerCase(), role: UserRole.STUDENT },
+        })
+      : await this.prisma.user.findFirst({
+          where: { campusId, studentId: id, role: UserRole.STUDENT },
+        });
+
+    // Generic error — never reveal whether the account exists or is unverified.
+    const invalid = () => new UnauthorizedException('Invalid email/Student ID or password.');
+    if (!user || !user.passwordHash) throw invalid();
+    if (user.status === 'blocked') throw new UnauthorizedException('Your account has been blocked.');
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) throw invalid();
+    if (!user.verified) {
+      throw new UnauthorizedException('Please verify your email before logging in.');
+    }
+    return this.issueSession({ sub: user.id, role: UserRole.STUDENT, campusId });
+  }
+
+  // ── Student: forgot / reset password (OTP to registered email) ──────
+  async studentForgotPassword(email: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const normalized = email.toLowerCase().trim();
+    const user = await this.prisma.user.findFirst({
+      where: { campusId, email: normalized, role: UserRole.STUDENT },
+    });
+    // Only send to a real, verified student; always return a generic response
+    // so we never disclose whether an email is registered.
+    if (user && user.verified && user.status !== 'blocked') {
+      await this.otp.issue(user.id, user.email, user.name);
+    }
+    return { sent: true };
+  }
+
+  async studentResetPassword(email: string, code: string, newPassword: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const normalized = email.toLowerCase().trim();
+    const user = await this.prisma.user.findFirst({
+      where: { campusId, email: normalized, role: UserRole.STUDENT },
+    });
+    if (!user) throw new BadRequestException('Invalid or expired OTP.');
+    await this.otp.verify(user.id, code); // throws on invalid/expired/lockout
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+    return { ok: true };
   }
 
   // ── Restaurant / Admin: password ────────────────────────────────────

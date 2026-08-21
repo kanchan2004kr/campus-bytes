@@ -3,10 +3,12 @@ import { Throttle } from '@nestjs/throttler';
 import { UserRole } from '@campus-bytes/types';
 import { AuthService } from './auth.service';
 import {
+  ForgotPasswordDto,
   OtpVerifyDto,
   PasswordLoginDto,
   RefreshDto,
-  StudentOtpRequestDto,
+  ResetPasswordDto,
+  StudentLoginDto,
   StudentResendDto,
   StudentSignupDto,
 } from './dto/auth.dto';
@@ -18,7 +20,7 @@ import type { AuthUser } from '../../common/auth/auth.types';
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
-  // ── Student: real email-OTP auth ──────────────────────────────────
+  // ── Student: password auth (signup verifies email via OTP) ─────────
   @Public()
   @Throttle({ default: { limit: 4, ttl: 60_000 } })
   @Post('student/signup')
@@ -28,11 +30,11 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @Post('student/request-otp')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('student/login')
   @HttpCode(200)
-  studentRequestOtp(@Body() dto: StudentOtpRequestDto) {
-    return this.auth.studentRequestOtp(dto.identifier);
+  studentLogin(@Body() dto: StudentLoginDto) {
+    return this.auth.studentLogin(dto.identifier, dto.password);
   }
 
   @Public()
@@ -49,6 +51,22 @@ export class AuthController {
   @HttpCode(200)
   studentVerifyOtp(@Body() dto: OtpVerifyDto) {
     return this.auth.studentVerifyOtp(dto.email, dto.code);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 4, ttl: 60_000 } })
+  @Post('student/forgot-password')
+  @HttpCode(200)
+  studentForgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.auth.studentForgotPassword(dto.email);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('student/reset-password')
+  @HttpCode(200)
+  studentResetPassword(@Body() dto: ResetPasswordDto) {
+    return this.auth.studentResetPassword(dto.email, dto.code, dto.password);
   }
 
   @Public()

@@ -18,9 +18,47 @@ export class StudentSignupDto {
 
   @IsEmail({}, { message: 'Enter a valid email address' })
   email!: string;
+
+  @IsString({ message: 'Password is required' })
+  @MinLength(8, { message: 'Password must be at least 8 characters' })
+  @MaxLength(72, { message: 'Password is too long' })
+  password!: string;
 }
 
-/** Login: accepts an email or a Student ID. */
+/** Normal student login — email or Student ID + password (no OTP). */
+export class StudentLoginDto {
+  @IsString()
+  @MinLength(3, { message: 'Enter your email or Student ID' })
+  @MaxLength(120)
+  identifier!: string;
+
+  @IsString({ message: 'Password is required' })
+  @MinLength(1)
+  @MaxLength(72)
+  password!: string;
+}
+
+/** Forgot password — send a reset OTP to the registered email. */
+export class ForgotPasswordDto {
+  @IsEmail({}, { message: 'Enter a valid email address' })
+  email!: string;
+}
+
+/** Reset password with the emailed OTP. */
+export class ResetPasswordDto {
+  @IsEmail({}, { message: 'Enter a valid email address' })
+  email!: string;
+
+  @Matches(/^\d{6}$/, { message: 'OTP must be 6 digits' })
+  code!: string;
+
+  @IsString({ message: 'Password is required' })
+  @MinLength(8, { message: 'Password must be at least 8 characters' })
+  @MaxLength(72, { message: 'Password is too long' })
+  password!: string;
+}
+
+/** Login: accepts an email or a Student ID (legacy OTP request — signup only). */
 export class StudentOtpRequestDto {
   @IsString()
   @MinLength(3, { message: 'Enter your email or Student ID' })

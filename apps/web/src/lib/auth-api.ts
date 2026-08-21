@@ -21,36 +21,60 @@ function persist(res: SessionResponse) {
   return res;
 }
 
-// ── Student signup / login (real email OTP) ──────────────────────────
+// ── Student: password auth (signup verifies email via OTP) ───────────
 export async function studentSignup(input: {
   name: string;
   studentId: string;
   course: string;
   email: string;
+  password: string;
 }): Promise<OtpSentResponse> {
   return api.post('/auth/student/signup', {
     name: input.name.trim(),
     studentId: input.studentId.trim(),
     course: input.course.trim(),
     email: input.email.trim().toLowerCase(),
+    password: input.password,
   });
 }
 
-/** Login: identifier is an email or Student ID. Returns the email to verify against. */
-export async function studentRequestOtp(identifier: string): Promise<OtpSentResponse> {
-  return api.post('/auth/student/request-otp', { identifier: identifier.trim() });
+/** Normal login: email or Student ID + password (no OTP). */
+export async function studentLogin(identifier: string, password: string): Promise<SessionResponse> {
+  const res = await api.post<SessionResponse>('/auth/student/login', {
+    identifier: identifier.trim(),
+    password,
+  });
+  return persist(res);
 }
 
 export async function studentResendOtp(email: string): Promise<OtpSentResponse> {
   return api.post('/auth/student/resend-otp', { email: email.trim().toLowerCase() });
 }
 
+/** Signup email verification → creates the account and logs the student in. */
 export async function studentVerifyOtp(email: string, code: string): Promise<SessionResponse> {
   const res = await api.post<SessionResponse>('/auth/student/verify-otp', {
     email: email.trim().toLowerCase(),
     code,
   });
   return persist(res);
+}
+
+// ── Student: forgot / reset password ─────────────────────────────────
+export async function studentForgotPassword(email: string): Promise<{ sent: true }> {
+  return api.post('/auth/student/forgot-password', { email: email.trim().toLowerCase() });
+}
+
+export async function studentResetPassword(
+  email: string,
+  code: string,
+  password: string,
+): Promise<{ ok: true }> {
+  return api.post('/auth/student/reset-password', {
+    email: email.trim().toLowerCase(),
+    code,
+    password,
+  });
 }
 
 // ── Restaurant / Admin (password) ────────────────────────────────────
