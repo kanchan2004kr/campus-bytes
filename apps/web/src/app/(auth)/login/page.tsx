@@ -7,7 +7,9 @@ import { Button, Field, Input, cn, toast } from '@campus-bytes/ui';
 import { Logo } from '@/components/brand/logo';
 import { ApiError } from '@/lib/api-client';
 import {
+  adminForgotPassword,
   adminLogin,
+  adminResetPassword,
   restaurantLogin,
   studentForgotPassword,
   studentLogin,
@@ -569,6 +571,11 @@ function PasswordAuth({ mode, onDone }: { mode: 'restaurant' | 'admin'; onDone: 
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forgot, setForgot] = useState(false);
+
+  if (mode === 'admin' && forgot) {
+    return <AdminResetFlow onBack={() => setForgot(false)} />;
+  }
 
   const submit = async () => {
     setBusy(true);
@@ -609,6 +616,126 @@ function PasswordAuth({ mode, onDone }: { mode: 'restaurant' | 'admin'; onDone: 
           'Sign in'
         )}
       </Button>
+      {mode === 'admin' && (
+        <button
+          type="button"
+          onClick={() => setForgot(true)}
+          className="text-center text-sm font-medium text-brand-600 hover:text-brand-700"
+        >
+          Forgot Password?
+        </button>
+      )}
+    </form>
+  );
+}
+
+/* Admin password reset: email → OTP (sent to the private recovery inbox) → new password. */
+function AdminResetFlow({ onBack }: { onBack: () => void }) {
+  const [step, setStep] = useState<'email' | 'reset'>('email');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const sendCode = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await adminForgotPassword(email);
+      setStep('reset');
+      toast({ tone: 'success', title: 'Check the recovery inbox', description: 'If the admin email is valid, a code has been sent.' });
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const passwordTooShort = password.length > 0 && password.length < 8;
+  const mismatch = confirm.length > 0 && confirm !== password;
+  const canReset = code.length === 6 && password.length >= 8 && confirm === password;
+
+  const reset = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await adminResetPassword(email, code, password);
+      toast({ tone: 'success', title: 'Password changed', description: 'Please sign in with your new password.' });
+      onBack();
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (step === 'email') {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (email.includes('@')) sendCode();
+        }}
+        className="flex flex-col gap-4"
+      >
+        <div>
+          <h2 className="font-display text-lg font-semibold text-ink-900">Reset admin password</h2>
+          <p className="text-sm text-ink-600">Enter the admin email — a one-time code is sent to the secure recovery inbox.</p>
+        </div>
+        <Field label="Admin email" htmlFor="ar-email" error={error ?? undefined}>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+            <Input id="ar-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="support@campusbytes.college" className="pl-9" autoFocus />
+          </div>
+        </Field>
+        <Button type="submit" block size="lg" loading={busy} disabled={!email.includes('@')}>
+          Send code <ArrowRight className="h-4 w-4" />
+        </Button>
+        <button type="button" onClick={onBack} className="text-center text-sm text-ink-500 hover:text-ink-700">
+          ← Back to sign in
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (canReset) reset();
+      }}
+      className="flex flex-col gap-4"
+    >
+      <div>
+        <h2 className="font-display text-lg font-semibold text-ink-900">Create a new password</h2>
+        <p className="text-sm text-ink-600">Enter the 6-digit code sent to the recovery inbox.</p>
+      </div>
+      <Field label="Verification code" htmlFor="ar-code">
+        <Input
+          id="ar-code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          placeholder="••••••"
+          className="text-center text-lg tracking-[0.4em]"
+          autoFocus
+        />
+      </Field>
+      <Field label="New password" htmlFor="ar-password" error={passwordTooShort ? 'Password must be at least 8 characters.' : undefined}>
+        <PasswordInput id="ar-password" value={password} onChange={setPassword} placeholder="At least 8 characters" />
+      </Field>
+      <Field label="Confirm new password" htmlFor="ar-confirm" error={mismatch ? 'Passwords do not match.' : (error ?? undefined)}>
+        <PasswordInput id="ar-confirm" value={confirm} onChange={setConfirm} placeholder="Re-enter your password" />
+      </Field>
+      <Button type="submit" block size="lg" loading={busy} disabled={!canReset}>
+        Reset password
+      </Button>
+      <button type="button" onClick={onBack} className="text-center text-sm text-ink-500 hover:text-ink-700">
+        ← Back to sign in
+      </button>
     </form>
   );
 }

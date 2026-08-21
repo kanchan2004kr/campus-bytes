@@ -171,6 +171,43 @@ export class AuthService {
     return { ok: true };
   }
 
+  // ── Admin: forgot / reset password (OTP to a private recovery email) ──
+  async adminForgotPassword(email: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const normalized = email.toLowerCase().trim();
+    const admin = await this.prisma.user.findFirst({
+      where: { campusId, email: normalized, role: UserRole.ADMIN },
+    });
+    // Recovery address is backend-only (never in the frontend/source). If it's
+    // not configured, we simply don't send — but still return a generic response.
+    const recovery = process.env.ADMIN_RECOVERY_EMAIL?.trim();
+    if (admin && admin.status !== 'blocked' && recovery) {
+      try {
+        // OTP is bound to the admin account but delivered to the trusted recovery
+        // inbox, not the admin's own login email.
+        await this.otp.issue(admin.id, recovery, admin.name);
+      } catch {
+        // Never leak whether the account exists via errors.
+      }
+    }
+    return { sent: true };
+  }
+
+  async adminResetPassword(email: string, code: string, newPassword: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const normalized = email.toLowerCase().trim();
+    const admin = await this.prisma.user.findFirst({
+      where: { campusId, email: normalized, role: UserRole.ADMIN },
+    });
+    if (!admin) throw new BadRequestException('Invalid or expired OTP.');
+    await this.otp.verify(admin.id, code); // throws on invalid/expired/lockout
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id: admin.id }, data: { passwordHash } });
+    // Force re-login everywhere (old sessions/passwords stop working).
+    await this.tokens.revokeAll(admin.id);
+    return { ok: true };
+  }
+
   // ── Restaurant / Admin: password ────────────────────────────────────
   async passwordLogin(email: string, password: string, role: UserRole) {
     const campusId = await this.tenant.getDefaultCampusId();

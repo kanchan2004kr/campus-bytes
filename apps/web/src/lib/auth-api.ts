@@ -94,6 +94,23 @@ export async function adminLogin(email: string, password: string): Promise<Sessi
   return persist(res);
 }
 
+// ── Admin: forgot / reset password (OTP to a private recovery email) ──
+export async function adminForgotPassword(email: string): Promise<{ sent: true }> {
+  return api.post('/auth/admin/forgot-password', { email: email.trim().toLowerCase() });
+}
+
+export async function adminResetPassword(
+  email: string,
+  code: string,
+  password: string,
+): Promise<{ ok: true }> {
+  return api.post('/auth/admin/reset-password', {
+    email: email.trim().toLowerCase(),
+    code,
+    password,
+  });
+}
+
 export async function logout(): Promise<void> {
   try {
     await api.post('/auth/logout');

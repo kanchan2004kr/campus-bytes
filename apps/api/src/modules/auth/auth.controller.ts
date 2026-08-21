@@ -86,6 +86,22 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 4, ttl: 60_000 } })
+  @Post('admin/forgot-password')
+  @HttpCode(200)
+  adminForgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.auth.adminForgotPassword(dto.email);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('admin/reset-password')
+  @HttpCode(200)
+  adminResetPassword(@Body() dto: ResetPasswordDto) {
+    return this.auth.adminResetPassword(dto.email, dto.code, dto.password);
+  }
+
+  @Public()
   @Post('refresh')
   @HttpCode(200)
   refresh(@Body() dto: RefreshDto) {
