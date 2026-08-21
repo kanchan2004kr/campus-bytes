@@ -8,16 +8,24 @@ import { getStudentProfile } from '@/data/client';
 
 // Food floating "charo taraf" (all around) the character. Positions are % within
 // the banner; sizes/animation scale down on small screens via clamp().
+// Positioned AROUND the character (top, right edge, bottom + the gap beside the
+// text) — never over the centre where the face / phone / hands are, and never
+// over the left text column.
+// All positions live in the 55–93% band (over the character's side, never the
+// left text column) and hug the perimeter — clear of the face (~66–80% / top)
+// and the phone/hands (~centre). Gives the "food all around" look without
+// covering anything important.
 const FOODS: { e: string; top: string; left: string; size: number; delay: number }[] = [
-  { e: '🍔', top: '10%', left: '60%', size: 46, delay: 0 },
-  { e: '🥤', top: '30%', left: '86%', size: 40, delay: 0.6 },
-  { e: '🍜', top: '64%', left: '82%', size: 44, delay: 1.2 },
-  { e: '🌮', top: '78%', left: '62%', size: 40, delay: 0.3 },
-  { e: '🍕', top: '48%', left: '52%', size: 34, delay: 0.9 },
-  { e: '🍗', top: '84%', left: '46%', size: 30, delay: 1.5 },
-  { e: '🧅', top: '20%', left: '48%', size: 26, delay: 1.8 },
-  { e: '🍟', top: '58%', left: '92%', size: 30, delay: 0.4 },
-  { e: '🌶️', top: '16%', left: '40%', size: 22, delay: 1.1 },
+  { e: '🍔', top: '6%', left: '57%', size: 42, delay: 0 },
+  { e: '🥤', top: '8%', left: '86%', size: 40, delay: 0.6 },
+  { e: '🍩', top: '24%', left: '94%', size: 26, delay: 0.8 },
+  { e: '🌮', top: '22%', left: '55%', size: 30, delay: 0.3 },
+  { e: '🍟', top: '46%', left: '93%', size: 32, delay: 0.4 },
+  { e: '🌶️', top: '40%', left: '56%', size: 22, delay: 1.1 },
+  { e: '🍜', top: '64%', left: '90%', size: 42, delay: 1.2 },
+  { e: '🧅', top: '68%', left: '56%', size: 24, delay: 1.8 },
+  { e: '🍗', top: '86%', left: '82%', size: 30, delay: 1.5 },
+  { e: '🍕', top: '88%', left: '64%', size: 32, delay: 0.9 },
 ];
 
 export function Hero() {
@@ -44,15 +52,24 @@ export function Hero() {
       <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
       <div aria-hidden className="pointer-events-none absolute -bottom-16 left-1/3 h-44 w-44 rounded-full bg-amber-300/20 blur-2xl" />
 
-      {/* Character — transparent PNG, so it blends perfectly onto the orange. Kept
-          `contain` + bottom-anchored so it is never cropped on any screen. */}
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex w-[52%] items-end justify-center sm:w-[52%] md:w-[50%] lg:w-[48%]">
+      {/* Radial halo behind the character — merges it into the scene with depth. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 w-[60%] md:w-[56%] lg:w-[54%]"
+        style={{ background: 'radial-gradient(60% 60% at 60% 45%, rgba(255,180,110,0.45) 0%, rgba(233,85,28,0) 70%)' }}
+      />
+
+      {/* Character — transparent PNG, so it blends perfectly onto the orange.
+          `contain` + bottom-anchored + full container height guarantees the whole
+          student (head, glasses, hands, phone, hoodie, backpack) is always visible,
+          never cropped, and stays visually dominant. */}
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex w-[54%] items-end justify-center sm:w-[54%] md:w-[52%] lg:w-[50%]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/hero-boy.png"
           alt=""
           aria-hidden
-          className="h-[104%] w-full object-contain object-bottom drop-shadow-[0_10px_24px_rgba(120,30,0,0.25)]"
+          className="h-full w-full object-contain object-bottom drop-shadow-[0_12px_26px_rgba(120,30,0,0.28)]"
           onError={(ev) => {
             // If the asset isn't added yet, hide gracefully (no broken icon).
             (ev.currentTarget as HTMLImageElement).style.display = 'none';
