@@ -35,15 +35,20 @@ export class OtpService {
     const codeHash = await bcrypt.hash(code, 10);
     const expiresAt = new Date(Date.now() + this.env.otp.ttlMinutes * 60 * 1000);
 
-    // Invalidate any previous unconsumed codes so only the newest is valid.
-    await this.prisma.otpCode.updateMany({
-      where: { userId, consumedAt: null },
-      data: { consumedAt: new Date() },
-    });
-
-    // Send the email first; only persist the code if the email actually went out.
+    // Send the email first. If it throws, we commit nothing below — so a failed
+    // send never invalidates a still-valid prior code and never leaves the
+    // account rate-limited on a send that didn't actually go out.
     await this.mail.sendOtp(email, code, name);
-    await this.prisma.otpCode.create({ data: { userId, codeHash, expiresAt } });
+
+    // Only after a successful send: atomically invalidate any previous unconsumed
+    // codes and persist the new one, so exactly the newest code is valid.
+    await this.prisma.$transaction([
+      this.prisma.otpCode.updateMany({
+        where: { userId, consumedAt: null },
+        data: { consumedAt: new Date() },
+      }),
+      this.prisma.otpCode.create({ data: { userId, codeHash, expiresAt } }),
+    ]);
   }
 
   /** Verify a code; returns true on success, throws on lockout/expiry/invalid. */
