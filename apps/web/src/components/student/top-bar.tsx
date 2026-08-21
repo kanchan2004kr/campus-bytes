@@ -1,22 +1,24 @@
 'use client';
 
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, ChevronDown, MapPin, User } from 'lucide-react';
+import { Bell, MapPin, User } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/brand/logo';
 import { getStudentProfile } from '@/data/client';
-import { DeliveryLocationPicker } from './delivery-location-picker';
 
+/**
+ * Home/top header. The delivery address here is DISPLAY-ONLY — students change
+ * it from Profile → Delivery Address or during checkout, never from Home. No
+ * address form/modal is mounted here.
+ */
 export function StudentTopBar() {
   const { data } = useQuery({ queryKey: ['student-profile'], queryFn: getStudentProfile });
-  const [pickerOpen, setPickerOpen] = useState(false);
   const loc = data?.deliveryLocation ?? null;
   const label = loc
     ? loc.type === 'hostel' && loc.roomNo
-      ? `${loc.name} · Room ${loc.roomNo}`
+      ? `${loc.name}, Room ${loc.roomNo}`
       : loc.name
-    : 'Select delivery location';
+    : null;
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur">
@@ -26,24 +28,30 @@ export function StudentTopBar() {
             <Logo showWordmark={false} size={30} className="md:hidden" />
             <Logo size={30} className="hidden md:inline-flex" />
           </Link>
-          <button
-            type="button"
-            onClick={() => setPickerOpen(true)}
-            className="flex min-w-0 items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-surface-cream"
-          >
+
+          {/* Display-only delivery address (no form/modal on Home). */}
+          <div className="flex min-w-0 items-center gap-2 px-1 py-1">
             <MapPin className="h-4 w-4 shrink-0 text-brand-600" />
             <span className="flex min-w-0 flex-col leading-tight">
               <span className="text-2xs font-medium uppercase tracking-wide text-ink-400">
-                Deliver to
+                Delivery address
               </span>
-              <span className="flex items-center gap-1 text-sm font-semibold text-ink-900">
-                <span className="truncate">{label}</span>
-                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-ink-400" />
-              </span>
+              {label ? (
+                <span className="truncate text-sm font-semibold text-ink-900">{label}</span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-sm font-semibold text-ink-900">
+                  Not added
+                  <Link
+                    href="/delivery-address?next=/"
+                    className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                  >
+                    Add address
+                  </Link>
+                </span>
+              )}
             </span>
-          </button>
+          </div>
         </div>
-        <DeliveryLocationPicker open={pickerOpen} onClose={() => setPickerOpen(false)} current={loc} />
 
         <div className="flex items-center gap-1">
           <Link
