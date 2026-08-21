@@ -36,7 +36,7 @@ export function RequireRole({ role, children }: { role: Role; children: React.Re
       return;
     }
     setReady(true);
-  }, [user, role, router]);
+  }, [user, hasHydrated, role, router]);
 
   if (!ready) {
     return (
