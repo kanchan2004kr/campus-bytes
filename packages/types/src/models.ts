@@ -119,6 +119,13 @@ export interface Order {
   deliveryZoneId: UUID | null;
   deliveryHostelName: string | null;
   deliveryRoomNo: string | null;
+  // Approved campus delivery location snapshot (frozen at order time).
+  deliveryType: string | null; // 'hostel' | 'gate' | 'university'
+  deliveryLocationName: string | null;
+  deliveryInstructions: string | null;
+  // Student identity for restaurant/admin order views.
+  studentName: string | null;
+  studentId2: string | null; // university student ID (distinct from the user UUID)
   status: OrderStatus;
   prepTimeMin: number | null;
   itemTotal: number;

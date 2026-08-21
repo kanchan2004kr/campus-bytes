@@ -123,6 +123,14 @@ model User {
   roomId    String?
   verified  Boolean @default(false) // email verified via OTP
 
+  // Saved campus delivery location (approved NIMS locations only; validated
+  // against @campus-bytes/types CAMPUS_DELIVERY_LOCATIONS). Flat snapshot so a
+  // student reuses it across orders without re-selecting.
+  savedDeliveryType         String? // 'hostel' | 'gate' | 'university'
+  savedDeliveryName         String? // e.g. 'Sunstone' / 'Library' / 'Gate No. 1'
+  savedDeliveryRoomNo       String? // hostels only
+  savedDeliveryInstructions String?
+
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -332,6 +340,11 @@ model Order {
   deliveryZoneId  String?
   deliveryHostelName String?
   deliveryRoomNo  String?
+  // Delivery-location snapshot frozen at order time (approved location list).
+  // Never changes when the student later edits their saved location.
+  deliveryType         String? // 'hostel' | 'gate' | 'university'
+  deliveryLocationName String? // approved location name at time of order
+  deliveryInstructions String?
   status          OrderStatus   @default(placed)
   prepTimeMin     Int?
   itemTotal       Decimal       @db.Decimal(10, 2)

@@ -14,6 +14,11 @@ export function toOrder(o: any): Order {
     deliveryZoneId: o.deliveryZoneId ?? null,
     deliveryHostelName: o.deliveryHostelName ?? null,
     deliveryRoomNo: o.deliveryRoomNo ?? null,
+    deliveryType: o.deliveryType ?? null,
+    deliveryLocationName: o.deliveryLocationName ?? null,
+    deliveryInstructions: o.deliveryInstructions ?? null,
+    studentName: o.student?.name ?? null,
+    studentId2: o.student?.studentId ?? null,
     status: o.status,
     prepTimeMin: o.prepTimeMin ?? null,
     itemTotal: dec(o.itemTotal),
@@ -41,6 +46,7 @@ export function toOrderItem(i: any): OrderItem {
 
 export const ORDER_INCLUDE = {
   restaurant: { select: { name: true } },
+  student: { select: { name: true, studentId: true } },
   cart: { select: { label: true } },
   items: true,
   payment: { select: { status: true } },

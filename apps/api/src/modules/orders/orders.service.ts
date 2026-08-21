@@ -11,6 +11,8 @@ import {
   UserRole,
   canTransition,
   isCancellableByStudent,
+  isValidDeliveryLocation,
+  locationTypeRequiresRoom,
 } from '@campus-bytes/types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantService } from '../tenant/tenant.service';
@@ -88,13 +90,24 @@ export class OrdersService {
     const fees = (settings?.deliveryFee ?? 20) + (settings?.convenienceFee ?? 0);
     const grandTotal = itemTotal + fees;
 
-    // Delivery location snapshot
+    // Delivery location — the student MUST have a saved, approved campus location.
+    // We snapshot it onto the order so old orders never change if they later edit it.
     const student = await this.prisma.user.findUnique({
       where: { id: user.sub },
-      include: { hostel: true, room: true },
     });
-    const hostelName = student?.hostel?.name ?? null;
-    const roomNo = student?.room?.roomNo ?? null;
+    const dType = student?.savedDeliveryType ?? null;
+    const dName = student?.savedDeliveryName ?? null;
+    if (!dType || !dName || !isValidDeliveryLocation(dType, dName)) {
+      throw new BadRequestException('Please select your delivery location before placing your order.');
+    }
+    const dRoomNo = locationTypeRequiresRoom(dType) ? student?.savedDeliveryRoomNo ?? null : null;
+    if (locationTypeRequiresRoom(dType) && !dRoomNo) {
+      throw new BadRequestException('A room number is required for hostel delivery.');
+    }
+    const dInstructions = student?.savedDeliveryInstructions ?? null;
+    // Keep legacy hostel-name column populated for hostel deliveries.
+    const hostelName = dType === 'hostel' ? dName : null;
+    const roomNo = dRoomNo;
 
     const code = await this.nextCode(campusId);
 
@@ -109,6 +122,9 @@ export class OrdersService {
         deliveryZoneId: dto.deliveryZoneId ?? null,
         deliveryHostelName: hostelName,
         deliveryRoomNo: roomNo,
+        deliveryType: dType,
+        deliveryLocationName: dName,
+        deliveryInstructions: dInstructions,
         status: OrderStatus.PLACED,
         itemTotal,
         fees,
