@@ -94,16 +94,6 @@ export function Hero() {
         </span>
       ))}
 
-      {/* Composed banner artwork (boy + food + orange, one designed image). When
-          present at /hero-banner.png it renders the exact illustration and covers
-          the emoji fallback above; if absent it's transparent and the fallback
-          composition shows through. Text is always overlaid on the left. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: 'url(/hero-banner.png)' }}
-      />
-
       {/* Left scrim keeps text crisp over the scene. */}
       <div
         aria-hidden
