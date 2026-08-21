@@ -79,6 +79,14 @@ class ResetRestaurantPwDto {
   @IsString() @MinLength(8) @MaxLength(72)
   password!: string;
 }
+class CreateOwnerDto {
+  @IsEmail()
+  ownerEmail!: string;
+  @IsOptional() @IsString() @MaxLength(80)
+  ownerName?: string;
+  @IsString() @MinLength(8) @MaxLength(72)
+  password!: string;
+}
 class OwnerStatusDto {
   @IsBoolean()
   active!: boolean;
@@ -109,6 +117,16 @@ export class AdminController {
   @HttpCode(200)
   createRestaurant(@CurrentUser() u: AuthUser, @Body() dto: CreateRestaurantDto) {
     return this.admin.createRestaurant(u, dto);
+  }
+
+  @Post('restaurants/:id/create-owner')
+  @HttpCode(200)
+  createRestaurantOwner(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateOwnerDto,
+  ) {
+    return this.admin.createRestaurantOwner(u, id, dto);
   }
 
   @Patch('restaurants/:id')

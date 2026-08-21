@@ -178,6 +178,37 @@ export class AdminService {
     return { id: restaurant.id, name: restaurant.name, ownerEmail: owner.email, status: restaurant.status };
   }
 
+  /** Attach an owner login to an EXISTING restaurant that has none yet. */
+  async createRestaurantOwner(
+    user: AuthUser,
+    restaurantId: string,
+    dto: { ownerEmail: string; ownerName?: string; password: string },
+  ) {
+    const campusId = user.campusId;
+    const r = await this.prisma.restaurant.findUnique({ where: { id: restaurantId } });
+    if (!r || r.deletedAt) throw new NotFoundException('Restaurant not found');
+    if (r.ownerUserId) throw new BadRequestException('This restaurant already has an owner account.');
+
+    const email = dto.ownerEmail.toLowerCase().trim();
+    const existing = await this.prisma.user.findFirst({ where: { campusId, email } });
+    if (existing) throw new BadRequestException('An account with this email already exists.');
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const owner = await this.prisma.user.create({
+      data: {
+        campusId,
+        email,
+        role: UserRole.RESTAURANT,
+        name: dto.ownerName?.trim() || r.name,
+        passwordHash,
+        verified: true,
+      },
+    });
+    await this.prisma.restaurant.update({ where: { id: r.id }, data: { ownerUserId: owner.id } });
+    await this.audit.log({ ...this.actor(user), action: 'Created owner for restaurant', target: r.name });
+    return { id: r.id, name: r.name, ownerEmail: owner.email };
+  }
+
   async updateRestaurant(
     user: AuthUser,
     id: string,
