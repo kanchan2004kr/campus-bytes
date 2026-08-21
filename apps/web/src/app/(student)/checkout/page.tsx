@@ -7,7 +7,6 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button, EmptyState, toast } from '@campus-bytes/ui';
 import { getStudentProfile } from '@/data/client';
-import { DeliveryLocationPicker } from '@/components/student/delivery-location-picker';
 import { useCartStore } from '@/stores/cart-store';
 import { formatCurrency } from '@/lib/format';
 import { startCheckout } from '@/lib/payment';
@@ -25,7 +24,6 @@ export default function CheckoutPage() {
   const { lines, restaurantName, restaurantId, notes } = useCartStore();
   const itemTotal = useCartStore((s) => s.itemTotal());
   const [submitting, setSubmitting] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const { data: profile } = useQuery({ queryKey: ['student-profile'], queryFn: getStudentProfile });
 
   if (lines.length === 0) {
@@ -46,7 +44,7 @@ export default function CheckoutPage() {
         title: 'Delivery location required',
         description: 'Please select your delivery location before placing your order.',
       });
-      setPickerOpen(true);
+      router.push('/delivery-address?next=/checkout');
       return;
     }
     setSubmitting(true);
@@ -86,43 +84,37 @@ export default function CheckoutPage() {
         <h1 className="font-display text-2xl font-bold text-ink-900">Checkout</h1>
       </div>
 
-      {/* Delivery location */}
+      {/* Delivery address — read-only card sourced from the saved profile
+          location. Editing happens in the dedicated /delivery-address flow. */}
       <section className="rounded-lg border border-line bg-surface p-4">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 font-display font-semibold text-ink-900">
-            <MapPin className="h-4 w-4 text-brand-600" /> Deliver to
+            <MapPin className="h-4 w-4 text-brand-600" /> Delivery Address
           </h2>
-          {loc && (
-            <button className="text-sm font-medium text-brand-600" onClick={() => setPickerOpen(true)}>
-              Change Location
-            </button>
-          )}
+          <Link
+            href="/delivery-address?next=/checkout"
+            className="text-sm font-medium text-brand-600"
+          >
+            {loc ? 'Change Address' : 'Add Delivery Address'}
+          </Link>
         </div>
         {loc ? (
           <div className="mt-2">
             <p className="text-sm font-semibold text-ink-900">
               {loc.name}
-              {loc.type === 'hostel' && loc.roomNo ? ` · Room ${loc.roomNo}` : ''}
+              {loc.type === 'hostel' && loc.roomNo ? `, Room ${loc.roomNo}` : ''}
             </p>
             <p className="text-xs text-ink-400">
-              {TYPE_LABEL[loc.type] ?? loc.type} · University cart delivery
+              {TYPE_LABEL[loc.type] ?? loc.type} · NIMS University Campus · University cart delivery
             </p>
             {loc.instructions && (
               <p className="mt-1 text-xs italic text-ink-600">“{loc.instructions}”</p>
             )}
           </div>
         ) : (
-          <div className="mt-2">
-            <p className="text-sm text-error">
-              Please select your delivery location before placing your order.
-            </p>
-            <Button size="sm" className="mt-2" onClick={() => setPickerOpen(true)}>
-              Select Delivery Location
-            </Button>
-          </div>
+          <p className="mt-2 text-sm text-error">No delivery address added.</p>
         )}
       </section>
-      <DeliveryLocationPicker open={pickerOpen} onClose={() => setPickerOpen(false)} current={loc} />
 
       {/* Order summary */}
       <section className="rounded-lg border border-line bg-surface p-4">

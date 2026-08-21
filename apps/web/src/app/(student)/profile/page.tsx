@@ -1,13 +1,11 @@
 'use client';
 
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Bell, ChevronRight, HelpCircle, LogOut, MapPin, Receipt, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@campus-bytes/ui';
 import { getStudentProfile } from '@/data/client';
-import { DeliveryLocationPicker } from '@/components/student/delivery-location-picker';
 import { logout } from '@/lib/auth-api';
 
 const MENU = [
@@ -27,7 +25,6 @@ export default function ProfilePage() {
   const { data } = useQuery({ queryKey: ['student-profile'], queryFn: getStudentProfile });
   const studentName = data?.name ?? 'Student';
   const loc = data?.deliveryLocation ?? null;
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -54,13 +51,12 @@ export default function ProfilePage() {
           <h2 className="flex items-center gap-2 font-display font-semibold text-ink-900">
             <MapPin className="h-4 w-4 text-brand-600" /> Delivery Location
           </h2>
-          <button
-            type="button"
+          <Link
+            href="/delivery-address?next=/profile"
             className="text-sm font-medium text-brand-600"
-            onClick={() => setPickerOpen(true)}
           >
             {loc ? 'Change' : 'Add Location'}
-          </button>
+          </Link>
         </div>
         {loc ? (
           <div className="mt-2 text-sm">
@@ -79,7 +75,6 @@ export default function ProfilePage() {
           </p>
         )}
       </div>
-      <DeliveryLocationPicker open={pickerOpen} onClose={() => setPickerOpen(false)} current={loc} />
 
       <div className="overflow-hidden rounded-lg border border-line bg-surface">
         {MENU.map((item, i) => (
