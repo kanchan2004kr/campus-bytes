@@ -146,9 +146,14 @@ export class AuthService {
       where: { campusId, email: normalized, role: UserRole.STUDENT },
     });
     // Only send to a real, verified student; always return a generic response
-    // so we never disclose whether an email is registered.
+    // (even if the send fails) so we never disclose whether an email is
+    // registered via status codes.
     if (user && user.verified && user.status !== 'blocked') {
-      await this.otp.issue(user.id, user.email, user.name);
+      try {
+        await this.otp.issue(user.id, user.email, user.name);
+      } catch {
+        // Swallow send/throttle errors — never leak account existence.
+      }
     }
     return { sent: true };
   }
