@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, GraduationCap, IdCard, KeyRound, Mail, ShieldCheck } from 'lucide-react';
+import { ArrowRight, GraduationCap, IdCard, KeyRound, Mail, ShieldCheck, User } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Field, Input, cn, toast } from '@campus-bytes/ui';
@@ -165,19 +165,24 @@ function LoginForm({ onSent }: { onSent: (email: string) => void }) {
 }
 
 function SignupForm({ onSent }: { onSent: (email: string) => void }) {
+  const [name, setName] = useState('');
   const [studentId, setStudentId] = useState('');
   const [course, setCourse] = useState('');
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const valid = studentId.trim().length >= 3 && course.trim().length >= 2 && email.includes('@');
+  const valid =
+    name.trim().length >= 2 &&
+    studentId.trim().length >= 3 &&
+    course.trim().length >= 2 &&
+    email.includes('@');
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      const res = await studentSignup({ studentId, course, email });
+      const res = await studentSignup({ name, studentId, course, email });
       onSent(res.email);
     } catch (e) {
       setError(errMessage(e));
@@ -199,10 +204,17 @@ function SignupForm({ onSent }: { onSent: (email: string) => void }) {
         <p className="text-sm text-ink-600">We’ll verify your email with a one-time code.</p>
       </div>
 
+      <Field label="Full Name" htmlFor="fullName">
+        <div className="relative">
+          <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+          <Input id="fullName" value={name} onChange={(e) => setName(e.target.value)} placeholder="Kanchan Yadav" className="pl-9" autoFocus />
+        </div>
+      </Field>
+
       <Field label="Student ID" htmlFor="studentId">
         <div className="relative">
           <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <Input id="studentId" value={studentId} onChange={(e) => setStudentId(e.target.value)} placeholder="NIMS2023CS047" className="pl-9" autoFocus />
+          <Input id="studentId" value={studentId} onChange={(e) => setStudentId(e.target.value)} placeholder="NIMS2023CS047" className="pl-9" />
         </div>
       </Field>
 

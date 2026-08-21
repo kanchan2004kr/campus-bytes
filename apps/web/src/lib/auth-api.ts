@@ -23,11 +23,13 @@ function persist(res: SessionResponse) {
 
 // ── Student signup / login (real email OTP) ──────────────────────────
 export async function studentSignup(input: {
+  name: string;
   studentId: string;
   course: string;
   email: string;
 }): Promise<OtpSentResponse> {
   return api.post('/auth/student/signup', {
+    name: input.name.trim(),
     studentId: input.studentId.trim(),
     course: input.course.trim(),
     email: input.email.trim().toLowerCase(),

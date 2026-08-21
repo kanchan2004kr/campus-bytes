@@ -1,6 +1,11 @@
 import { IsEmail, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class StudentSignupDto {
+  @IsString({ message: 'Full name is required' })
+  @MinLength(2, { message: 'Enter your full name' })
+  @MaxLength(80)
+  name!: string;
+
   @IsString({ message: 'Student ID is required' })
   @MinLength(3, { message: 'Enter a valid Student ID' })
   @MaxLength(40)

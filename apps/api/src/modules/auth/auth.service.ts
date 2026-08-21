@@ -23,11 +23,12 @@ export class AuthService {
   ) {}
 
   // ── Student: signup (Student ID + Course + Email) ───────────────────
-  async studentSignup(input: { studentId: string; course: string; email: string }) {
+  async studentSignup(input: { name: string; studentId: string; course: string; email: string }) {
     const campusId = await this.tenant.getDefaultCampusId();
     const email = input.email.toLowerCase().trim();
     const studentId = input.studentId.trim();
     const course = input.course.trim();
+    const fullName = input.name.trim();
 
     // Email already registered & verified → they should log in instead.
     const byEmail = await this.prisma.user.findFirst({
@@ -45,8 +46,9 @@ export class AuthService {
       throw new ConflictException('This Student ID is already registered.');
     }
 
-    // Create or resume an unverified signup for this email.
-    const name = email.split('@')[0] || 'Student';
+    // Create or resume an unverified signup for this email. The student's real
+    // full name (collected at signup) is stored — never derived from the email.
+    const name = fullName || 'Student';
     const user = byEmail
       ? await this.prisma.user.update({
           where: { id: byEmail.id },

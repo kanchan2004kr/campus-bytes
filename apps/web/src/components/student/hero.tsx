@@ -8,7 +8,7 @@ import { getStudentProfile } from '@/data/client';
 
 export function Hero() {
   const { data } = useQuery({ queryKey: ['student-profile'], queryFn: getStudentProfile });
-  const firstName = (data?.name ?? 'there').split(' ')[0];
+  const displayName = data?.name?.trim() || 'there';
 
   return (
     <section className="relative flex flex-col justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 to-brand-700 px-5 py-6 text-white h-[230px] sm:h-[250px] md:h-auto md:min-h-0 md:rounded-xl md:px-8 md:py-10 lg:min-h-[480px]">
@@ -48,7 +48,7 @@ export function Hero() {
       {/* Text — unchanged content, alignment, fonts and button. Constrained on phones so
           it never runs under the character illustration. */}
       <div className="relative z-10 max-w-[62%] sm:max-w-[62%] lg:max-w-md">
-        <p className="text-xs font-medium text-brand-100 sm:text-sm">Hey {firstName}</p>
+        <p className="text-xs font-medium text-brand-100 sm:text-sm">Hey, {displayName}</p>
         <h1 className="mt-1.5 font-display text-xl font-bold leading-[1.12] sm:text-2xl md:mt-2 md:text-4xl">
           Skip the queue.
           <br />
