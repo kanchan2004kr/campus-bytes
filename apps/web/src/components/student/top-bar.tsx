@@ -1,35 +1,49 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Bell, ChevronDown, MapPin, User } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/brand/logo';
 import { getStudentProfile } from '@/data/client';
+import { DeliveryLocationPicker } from './delivery-location-picker';
 
 export function StudentTopBar() {
   const { data } = useQuery({ queryKey: ['student-profile'], queryFn: getStudentProfile });
-  const deliverTo = { hostelName: data?.hostelName ?? '—', roomNo: data?.roomNo ?? '—' };
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const loc = data?.deliveryLocation ?? null;
+  const label = loc
+    ? loc.type === 'hostel' && loc.roomNo
+      ? `${loc.name} · Room ${loc.roomNo}`
+      : loc.name
+    : 'Select delivery location';
+
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur">
       <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-6">
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 items-center gap-4">
           <Link href="/" aria-label="Campus Bytes home">
             <Logo showWordmark={false} size={30} className="md:hidden" />
             <Logo size={30} className="hidden md:inline-flex" />
           </Link>
-          <button className="flex items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-surface-cream">
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="flex min-w-0 items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-surface-cream"
+          >
             <MapPin className="h-4 w-4 shrink-0 text-brand-600" />
-            <span className="flex flex-col leading-tight">
+            <span className="flex min-w-0 flex-col leading-tight">
               <span className="text-2xs font-medium uppercase tracking-wide text-ink-400">
                 Deliver to
               </span>
               <span className="flex items-center gap-1 text-sm font-semibold text-ink-900">
-                {deliverTo.hostelName} · Room {deliverTo.roomNo}
-                <ChevronDown className="h-3.5 w-3.5 text-ink-400" />
+                <span className="truncate">{label}</span>
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-ink-400" />
               </span>
             </span>
           </button>
         </div>
+        <DeliveryLocationPicker open={pickerOpen} onClose={() => setPickerOpen(false)} current={loc} />
 
         <div className="flex items-center gap-1">
           <Link

@@ -20,17 +20,52 @@ export const campusInfo = {
   studentName: 'Kabir',
 };
 
+export interface DeliveryLocation {
+  type: 'hostel' | 'gate' | 'university';
+  name: string;
+  roomNo: string | null;
+  instructions: string | null;
+}
+
 export interface StudentProfile {
   name: string;
   email: string;
   hostelName: string | null;
   roomNo: string | null;
+  deliveryLocation: DeliveryLocation | null;
 }
+
+// In-memory delivery location for demo mode (no backend) so the selector persists
+// within the session. Real mode always reads/writes the backend.
+let demoDeliveryLocation: DeliveryLocation | null = null;
 
 /** GET /students/me — the signed-in student's profile (drives greeting + deliver-to). */
 export async function getStudentProfile(): Promise<StudentProfile> {
   if (API_ENABLED) return api.get<StudentProfile>('/students/me');
-  return delay({ name: 'Kabir', email: 'student@nims.dev', hostelName: 'Larimar Hostel', roomNo: '811' });
+  return delay({
+    name: 'Kabir',
+    email: 'student@nims.dev',
+    hostelName: 'Larimar Hostel',
+    roomNo: '811',
+    deliveryLocation: demoDeliveryLocation,
+  });
+}
+
+/** PUT /students/me/delivery-location — save the approved campus delivery location. */
+export async function saveDeliveryLocation(input: {
+  type: 'hostel' | 'gate' | 'university';
+  name: string;
+  roomNo?: string;
+  instructions?: string;
+}): Promise<StudentProfile> {
+  if (API_ENABLED) return api.put<StudentProfile>('/students/me/delivery-location', input);
+  demoDeliveryLocation = {
+    type: input.type,
+    name: input.name,
+    roomNo: input.roomNo?.trim() || null,
+    instructions: input.instructions?.trim() || null,
+  };
+  return getStudentProfile();
 }
 
 /** GET /restaurants — approved + non-paused only (business rule). */

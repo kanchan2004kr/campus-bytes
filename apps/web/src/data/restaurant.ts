@@ -36,8 +36,14 @@ export interface RestaurantOrder {
   id: string;
   code: string;
   studentName: string;
+  studentId2?: string | null; // university student ID
   hostelName: string;
   roomNo: string;
+  // Approved delivery-location snapshot (works for hostel/gate/university).
+  deliveryType?: string | null;
+  deliveryLocationName?: string | null;
+  deliveryRoomNo?: string | null;
+  deliveryInstructions?: string | null;
   items: RestaurantOrderItem[];
   itemTotal: number;
   notes: string | null;
@@ -72,8 +78,13 @@ function makeOrder(
     id: p.id ?? `ord-${seq.n++}`,
     code: p.code ?? `CB${1050 + seq.n}`,
     studentName: p.studentName ?? 'Student',
+    studentId2: p.studentId2 ?? null,
     hostelName: p.hostelName ?? 'Larimar Hostel',
     roomNo: p.roomNo ?? '000',
+    deliveryType: p.deliveryType ?? 'hostel',
+    deliveryLocationName: p.deliveryLocationName ?? p.hostelName ?? 'Larimar',
+    deliveryRoomNo: p.deliveryRoomNo ?? p.roomNo ?? '000',
+    deliveryInstructions: p.deliveryInstructions ?? null,
     items: p.items,
     itemTotal: sum(p.items),
     notes: p.notes ?? null,

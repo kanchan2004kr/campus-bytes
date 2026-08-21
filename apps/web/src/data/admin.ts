@@ -50,6 +50,9 @@ export interface AdminLiveOrder {
   restaurantName: string;
   hostelName: string;
   roomNo: string;
+  deliveryType?: string | null;
+  deliveryLocationName?: string | null;
+  deliveryInstructions?: string | null;
   status: OrderStatus;
   cartLabel: string | null;
   grandTotal: number;

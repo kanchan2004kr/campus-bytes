@@ -178,7 +178,11 @@ export class AdminService {
       return {
         id: o.id, code: o.code, studentName: o.student?.name ?? '—',
         restaurantName: o.restaurant?.name ?? '—', hostelName: o.deliveryHostelName ?? '—',
-        roomNo: o.deliveryRoomNo ?? '—', status: o.status, cartLabel: o.cart?.label ?? null,
+        roomNo: o.deliveryRoomNo ?? '—',
+        deliveryType: o.deliveryType ?? null,
+        deliveryLocationName: o.deliveryLocationName ?? o.deliveryHostelName ?? '—',
+        deliveryInstructions: o.deliveryInstructions ?? null,
+        status: o.status, cartLabel: o.cart?.label ?? null,
         grandTotal: dec(o.grandTotal), elapsedMin, slaBreach: elapsedMin > 25,
       };
     });

@@ -98,10 +98,33 @@ export function OrderCard({ order }: { order: RestaurantOrder }) {
 
       {/* Body */}
       <div className="space-y-3 px-4 py-3">
-        <div className="flex items-center gap-1.5 text-xs text-ink-600">
-          <MapPin className="h-3.5 w-3.5 text-brand-600" />
-          {order.studentName} · {order.hostelName} · Room {order.roomNo}
-        </div>
+        {(() => {
+          const typeLabel: Record<string, string> = {
+            hostel: 'Hostel',
+            gate: 'Gate',
+            university: 'University',
+          };
+          const locName = order.deliveryLocationName ?? order.hostelName;
+          const roomNo = order.deliveryRoomNo ?? order.roomNo;
+          const isHostel = (order.deliveryType ?? 'hostel') === 'hostel';
+          return (
+            <div className="rounded-md border border-line bg-surface-cream px-3 py-2 text-xs">
+              <div className="flex items-center gap-1.5 font-medium text-ink-900">
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-brand-600" />
+                {order.studentName}
+                {order.studentId2 ? <span className="text-ink-400">· {order.studentId2}</span> : null}
+              </div>
+              <p className="mt-1 text-ink-700">
+                {order.deliveryType ? `${typeLabel[order.deliveryType] ?? order.deliveryType}: ` : ''}
+                <span className="font-medium text-ink-900">{locName}</span>
+                {isHostel && roomNo ? ` · Room ${roomNo}` : ''}
+              </p>
+              {order.deliveryInstructions ? (
+                <p className="mt-0.5 italic text-ink-600">“{order.deliveryInstructions}”</p>
+              ) : null}
+            </div>
+          );
+        })()}
 
         <ul className="space-y-1.5">
           {order.items.map((it, i) => (

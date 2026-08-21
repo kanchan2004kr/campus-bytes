@@ -7,17 +7,25 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button, EmptyState, toast } from '@campus-bytes/ui';
 import { getStudentProfile } from '@/data/client';
+import { DeliveryLocationPicker } from '@/components/student/delivery-location-picker';
 import { useCartStore } from '@/stores/cart-store';
 import { formatCurrency } from '@/lib/format';
 import { startCheckout } from '@/lib/payment';
 
 const DELIVERY_FEE = 20;
 
+const TYPE_LABEL: Record<string, string> = {
+  hostel: 'Hostel',
+  gate: 'Gate',
+  university: 'University Location',
+};
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { lines, restaurantName, restaurantId, notes } = useCartStore();
   const itemTotal = useCartStore((s) => s.itemTotal());
   const [submitting, setSubmitting] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const { data: profile } = useQuery({ queryKey: ['student-profile'], queryFn: getStudentProfile });
 
   if (lines.length === 0) {
@@ -29,9 +37,18 @@ export default function CheckoutPage() {
   }
 
   const total = itemTotal + DELIVERY_FEE;
-  const deliverTo = { hostelName: profile?.hostelName ?? '—', roomNo: profile?.roomNo ?? '—' };
+  const loc = profile?.deliveryLocation ?? null;
 
   const handlePay = async () => {
+    if (!loc) {
+      toast({
+        tone: 'error',
+        title: 'Delivery location required',
+        description: 'Please select your delivery location before placing your order.',
+      });
+      setPickerOpen(true);
+      return;
+    }
     setSubmitting(true);
     try {
       const result = await startCheckout({
@@ -75,13 +92,37 @@ export default function CheckoutPage() {
           <h2 className="flex items-center gap-2 font-display font-semibold text-ink-900">
             <MapPin className="h-4 w-4 text-brand-600" /> Deliver to
           </h2>
-          <button className="text-sm font-medium text-brand-600">Change</button>
+          {loc && (
+            <button className="text-sm font-medium text-brand-600" onClick={() => setPickerOpen(true)}>
+              Change Location
+            </button>
+          )}
         </div>
-        <p className="mt-2 text-sm text-ink-900">
-          {deliverTo.hostelName} · Room {deliverTo.roomNo}
-        </p>
-        <p className="text-xs text-ink-400">North Campus zone · University cart delivery</p>
+        {loc ? (
+          <div className="mt-2">
+            <p className="text-sm font-semibold text-ink-900">
+              {loc.name}
+              {loc.type === 'hostel' && loc.roomNo ? ` · Room ${loc.roomNo}` : ''}
+            </p>
+            <p className="text-xs text-ink-400">
+              {TYPE_LABEL[loc.type] ?? loc.type} · University cart delivery
+            </p>
+            {loc.instructions && (
+              <p className="mt-1 text-xs italic text-ink-600">“{loc.instructions}”</p>
+            )}
+          </div>
+        ) : (
+          <div className="mt-2">
+            <p className="text-sm text-error">
+              Please select your delivery location before placing your order.
+            </p>
+            <Button size="sm" className="mt-2" onClick={() => setPickerOpen(true)}>
+              Select Delivery Location
+            </Button>
+          </div>
+        )}
       </section>
+      <DeliveryLocationPicker open={pickerOpen} onClose={() => setPickerOpen(false)} current={loc} />
 
       {/* Order summary */}
       <section className="rounded-lg border border-line bg-surface p-4">

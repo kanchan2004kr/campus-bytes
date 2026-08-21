@@ -49,7 +49,12 @@ export default function AdminLiveOrdersPage() {
                     <TD className="font-semibold">#{o.code}</TD>
                     <TD className="text-ink-700">{o.studentName}</TD>
                     <TD className="text-ink-700">{o.restaurantName}</TD>
-                    <TD className="text-ink-600">{o.hostelName} · {o.roomNo}</TD>
+                    <TD className="text-ink-600">
+                      {(o.deliveryLocationName ?? o.hostelName)}
+                      {(o.deliveryType ?? 'hostel') === 'hostel' && o.roomNo && o.roomNo !== '—'
+                        ? ` · Room ${o.roomNo}`
+                        : ''}
+                    </TD>
                     <TD className="text-ink-600">{o.cartLabel ?? '—'}</TD>
                     <TD className="tabular-nums">{formatCurrency(o.grandTotal)}</TD>
                     <TD>
