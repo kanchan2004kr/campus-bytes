@@ -16,7 +16,10 @@ export class ApiError extends Error {
   }
 }
 
-const REQUEST_TIMEOUT_MS = 20_000;
+// Generous enough to survive a Render free-tier cold start (the backend spins
+// down when idle and the first request can take ~30-60s to wake). A shorter
+// timeout caused false "server took too long" failures on the first OTP request.
+const REQUEST_TIMEOUT_MS = 60_000;
 
 async function raw(method: string, path: string, body: unknown, token: string | null): Promise<Response> {
   // Abort hung requests so a slow/cold backend surfaces an error instead of
