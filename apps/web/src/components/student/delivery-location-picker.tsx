@@ -43,7 +43,7 @@ export function DeliveryLocationPicker({
       await qc.invalidateQueries({ queryKey: ['student-profile'] });
       onClose();
     },
-    onError: (e) => setError(e instanceof Error ? e.message : 'Could not save location.'),
+    onError: () => setError('Unable to save location. Please try again.'),
   });
 
   const submit = () => {

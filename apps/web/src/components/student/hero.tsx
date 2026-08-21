@@ -11,7 +11,7 @@ export function Hero() {
   const firstName = (data?.name ?? 'there').split(' ')[0];
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-brand-600 to-brand-700 px-5 py-7 text-white md:rounded-xl md:px-8 md:py-10 min-h-[300px] sm:min-h-[340px] lg:min-h-[480px]">
+    <section className="relative flex flex-col justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 to-brand-700 px-5 py-6 text-white h-[230px] sm:h-[250px] md:h-auto md:min-h-0 md:rounded-xl md:px-8 md:py-10 lg:min-h-[480px]">
       {/* Soft decorative shapes — subtle, not neon */}
       <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
       <div className="pointer-events-none absolute -bottom-16 right-16 h-44 w-44 rounded-full bg-brand-400/30 blur-2xl" />
@@ -47,20 +47,23 @@ export function Hero() {
 
       {/* Text — unchanged content, alignment, fonts and button. Constrained on phones so
           it never runs under the character illustration. */}
-      <div className="relative z-10 max-w-[60%] sm:max-w-[62%] lg:max-w-md">
-        <p className="text-sm font-medium text-brand-100">Hey {firstName}</p>
-        <h1 className="mt-2 font-display text-3xl font-bold leading-[1.1] md:text-4xl">
+      <div className="relative z-10 max-w-[62%] sm:max-w-[62%] lg:max-w-md">
+        <p className="text-xs font-medium text-brand-100 sm:text-sm">Hey {firstName}</p>
+        <h1 className="mt-1.5 font-display text-xl font-bold leading-[1.12] sm:text-2xl md:mt-2 md:text-4xl">
           Skip the queue.
           <br />
           Eat from your room.
         </h1>
-        <p className="mt-3 max-w-sm text-sm text-brand-50/90">
+        <p className="mt-2 line-clamp-2 max-w-sm text-xs text-brand-50/90 sm:text-sm md:mt-3 md:line-clamp-none">
           Order from your favourite campus outlets — prepared fresh and delivered by university carts.
         </p>
-        <div className="mt-5">
+        <div className="mt-3 md:mt-5">
           <Link
             href="/food"
-            className={cn(buttonVariants({ size: 'lg' }), 'bg-white text-brand-700 hover:bg-brand-50')}
+            className={cn(
+              buttonVariants({ size: 'md' }),
+              'bg-white text-brand-700 hover:bg-brand-50 md:h-12 md:px-6 md:text-base',
+            )}
           >
             Order now <ArrowRight className="h-4 w-4" />
           </Link>

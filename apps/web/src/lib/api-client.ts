@@ -16,16 +16,37 @@ export class ApiError extends Error {
   }
 }
 
+const REQUEST_TIMEOUT_MS = 20_000;
+
 async function raw(method: string, path: string, body: unknown, token: string | null): Promise<Response> {
-  return fetch(`${API_BASE_URL}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    credentials: 'include',
-  });
+  // Abort hung requests so a slow/cold backend surfaces an error instead of
+  // leaving callers (and their loading spinners/modals) stuck forever.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      credentials: 'include',
+      signal: controller.signal,
+    });
+  } catch (e) {
+    // Network failure or timeout → a typed ApiError so the UI can show a message.
+    const aborted = e instanceof DOMException && e.name === 'AbortError';
+    throw new ApiError(
+      aborted ? 'TIMEOUT' : 'NETWORK',
+      aborted
+        ? 'The server took too long to respond. Please try again.'
+        : 'Unable to connect to the server. Please try again.',
+      0,
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 let refreshing: Promise<string | null> | null = null;
