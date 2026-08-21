@@ -1,5 +1,5 @@
 import { Body, Controller, Patch } from '@nestjs/common';
-import { IsBoolean } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 import { UserRole } from '@campus-bytes/types';
 import { RestaurantsService } from './restaurants.service';
 import { Roles } from '../../common/auth/roles.decorator';
@@ -13,6 +13,16 @@ class PauseDto {
   paused!: boolean;
 }
 
+class ProfileDto {
+  @IsOptional() @IsString() @MaxLength(80) name?: string;
+  @IsOptional() @IsString() @MaxLength(280) description?: string;
+  @IsOptional() @IsString() @MaxLength(80) cuisine?: string;
+  @IsOptional() @IsString() @MaxLength(40) phone?: string;
+  @IsOptional() @IsString() @MaxLength(60) hours?: string;
+  @IsOptional() @IsString() @MaxLength(500) logoUrl?: string;
+  @IsOptional() @IsString() @MaxLength(500) coverUrl?: string;
+}
+
 @Roles(UserRole.RESTAURANT)
 @Controller('restaurant')
 export class RestaurantOwnerController {
@@ -24,5 +34,11 @@ export class RestaurantOwnerController {
   @Patch('status')
   async setStatus(@CurrentUser() user: AuthUser, @Body() dto: PauseDto) {
     return this.service.setPaused(await resolveRestaurantId(this.prisma, user), dto.paused);
+  }
+
+  @Patch('profile')
+  async updateProfile(@CurrentUser() user: AuthUser, @Body() dto: ProfileDto) {
+    // restaurantId is derived from the JWT — an owner can only edit their own.
+    return this.service.updateOwnProfile(await resolveRestaurantId(this.prisma, user), dto);
   }
 }

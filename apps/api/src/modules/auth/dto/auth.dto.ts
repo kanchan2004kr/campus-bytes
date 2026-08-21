@@ -88,6 +88,19 @@ export class PasswordLoginDto {
   password!: string;
 }
 
+/** Change password while authenticated (restaurant owner). */
+export class ChangePasswordDto {
+  @IsString({ message: 'Current password is required' })
+  @MinLength(1)
+  @MaxLength(72)
+  oldPassword!: string;
+
+  @IsString({ message: 'New password is required' })
+  @MinLength(8, { message: 'Password must be at least 8 characters' })
+  @MaxLength(72)
+  newPassword!: string;
+}
+
 export class RefreshDto {
   @IsString()
   @Length(10, 512)

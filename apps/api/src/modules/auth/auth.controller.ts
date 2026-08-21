@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { UserRole } from '@campus-bytes/types';
 import { AuthService } from './auth.service';
 import {
+  ChangePasswordDto,
   ForgotPasswordDto,
   OtpVerifyDto,
   PasswordLoginDto,
@@ -13,6 +14,7 @@ import {
   StudentSignupDto,
 } from './dto/auth.dto';
 import { Public } from '../../common/auth/public.decorator';
+import { Roles } from '../../common/auth/roles.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { AuthUser } from '../../common/auth/auth.types';
 
@@ -75,6 +77,29 @@ export class AuthController {
   @HttpCode(200)
   restaurantLogin(@Body() dto: PasswordLoginDto) {
     return this.auth.passwordLogin(dto.email, dto.password, UserRole.RESTAURANT);
+  }
+
+  @Roles(UserRole.RESTAURANT)
+  @Post('restaurant/change-password')
+  @HttpCode(200)
+  restaurantChangePassword(@CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto) {
+    return this.auth.restaurantChangePassword(user.sub, dto.oldPassword, dto.newPassword);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 4, ttl: 60_000 } })
+  @Post('restaurant/forgot-password')
+  @HttpCode(200)
+  restaurantForgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.auth.restaurantForgotPassword(dto.email);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('restaurant/reset-password')
+  @HttpCode(200)
+  restaurantResetPassword(@Body() dto: ResetPasswordDto) {
+    return this.auth.restaurantResetPassword(dto.email, dto.code, dto.password);
   }
 
   @Public()

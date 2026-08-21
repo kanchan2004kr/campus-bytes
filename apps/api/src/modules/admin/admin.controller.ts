@@ -10,11 +10,15 @@ import {
   HttpCode,
 } from '@nestjs/common';
 import {
+  IsBoolean,
+  IsEmail,
   IsEnum,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 import { CartStatus, RestaurantStatus, UserRole } from '@campus-bytes/types';
@@ -41,6 +45,44 @@ class BroadcastDto {
   @IsString() @MinLength(3) @MaxLength(280)
   message!: string;
 }
+class CreateRestaurantDto {
+  @IsString() @MinLength(2) @MaxLength(80)
+  name!: string;
+  @IsEmail()
+  ownerEmail!: string;
+  @IsOptional() @IsString() @MaxLength(80)
+  ownerName?: string;
+  @IsString() @MinLength(8) @MaxLength(72)
+  password!: string;
+  @IsOptional() @IsString() @MaxLength(280)
+  description?: string;
+  @IsOptional() @IsString() @MaxLength(80)
+  cuisine?: string;
+  @IsOptional() @IsString() @MaxLength(40)
+  phone?: string;
+  @IsOptional() @IsString() @MaxLength(60)
+  hours?: string;
+}
+class UpdateRestaurantDto {
+  @IsOptional() @IsString() @MaxLength(80) name?: string;
+  @IsOptional() @IsString() @MaxLength(280) description?: string;
+  @IsOptional() @IsString() @MaxLength(80) cuisine?: string;
+  @IsOptional() @IsString() @MaxLength(40) phone?: string;
+  @IsOptional() @IsString() @MaxLength(60) hours?: string;
+  @IsOptional() @IsString() @MaxLength(500) logoUrl?: string;
+  @IsOptional() @IsString() @MaxLength(500) coverUrl?: string;
+  @IsOptional() @IsInt() @Min(1) prepTimeMin?: number;
+  @IsOptional() @IsBoolean() deliveryAvailable?: boolean;
+  @IsOptional() @IsBoolean() isPaused?: boolean;
+}
+class ResetRestaurantPwDto {
+  @IsString() @MinLength(8) @MaxLength(72)
+  password!: string;
+}
+class OwnerStatusDto {
+  @IsBoolean()
+  active!: boolean;
+}
 
 /** All endpoints require ADMIN. RBAC enforced by RolesGuard, self-scoped to campus. */
 @Roles(UserRole.ADMIN)
@@ -61,6 +103,40 @@ export class AdminController {
   @Get('restaurants')
   restaurants(@CurrentUser() u: AuthUser, @Query('status') status?: RestaurantStatus) {
     return this.admin.listRestaurants(u.campusId, status);
+  }
+
+  @Post('restaurants')
+  @HttpCode(200)
+  createRestaurant(@CurrentUser() u: AuthUser, @Body() dto: CreateRestaurantDto) {
+    return this.admin.createRestaurant(u, dto);
+  }
+
+  @Patch('restaurants/:id')
+  updateRestaurant(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateRestaurantDto,
+  ) {
+    return this.admin.updateRestaurant(u, id, dto);
+  }
+
+  @Post('restaurants/:id/reset-password')
+  @HttpCode(200)
+  resetRestaurantPw(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ResetRestaurantPwDto,
+  ) {
+    return this.admin.resetRestaurantPassword(u, id, dto.password);
+  }
+
+  @Patch('restaurants/:id/owner-status')
+  setOwnerStatus(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: OwnerStatusDto,
+  ) {
+    return this.admin.setRestaurantOwnerStatus(u, id, dto.active);
   }
 
   @Post('restaurants/:id/approve')

@@ -10,7 +10,9 @@ import {
   adminForgotPassword,
   adminLogin,
   adminResetPassword,
+  restaurantForgotPassword,
   restaurantLogin,
+  restaurantResetPassword,
   studentForgotPassword,
   studentLogin,
   studentResendOtp,
@@ -573,8 +575,8 @@ function PasswordAuth({ mode, onDone }: { mode: 'restaurant' | 'admin'; onDone: 
   const [error, setError] = useState<string | null>(null);
   const [forgot, setForgot] = useState(false);
 
-  if (mode === 'admin' && forgot) {
-    return <AdminResetFlow onBack={() => setForgot(false)} />;
+  if (forgot) {
+    return <PasswordResetFlow mode={mode} onBack={() => setForgot(false)} />;
   }
 
   const submit = async () => {
@@ -616,21 +618,22 @@ function PasswordAuth({ mode, onDone }: { mode: 'restaurant' | 'admin'; onDone: 
           'Sign in'
         )}
       </Button>
-      {mode === 'admin' && (
-        <button
-          type="button"
-          onClick={() => setForgot(true)}
-          className="text-center text-sm font-medium text-brand-600 hover:text-brand-700"
-        >
-          Forgot Password?
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setForgot(true)}
+        className="text-center text-sm font-medium text-brand-600 hover:text-brand-700"
+      >
+        Forgot Password?
+      </button>
     </form>
   );
 }
 
-/* Admin password reset: email → OTP (sent to the private recovery inbox) → new password. */
-function AdminResetFlow({ onBack }: { onBack: () => void }) {
+/* Restaurant/Admin password reset: email → OTP → new password. Admin OTP goes to
+   the private recovery inbox; restaurant OTP goes to the owner's email. */
+function PasswordResetFlow({ mode, onBack }: { mode: 'restaurant' | 'admin'; onBack: () => void }) {
+  const forgotFn = mode === 'admin' ? adminForgotPassword : restaurantForgotPassword;
+  const resetFn = mode === 'admin' ? adminResetPassword : restaurantResetPassword;
   const [step, setStep] = useState<'email' | 'reset'>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -643,7 +646,7 @@ function AdminResetFlow({ onBack }: { onBack: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await adminForgotPassword(email);
+      await forgotFn(email);
       setStep('reset');
       toast({ tone: 'success', title: 'Check the recovery inbox', description: 'If the admin email is valid, a code has been sent.' });
     } catch (e) {
@@ -661,7 +664,7 @@ function AdminResetFlow({ onBack }: { onBack: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await adminResetPassword(email, code, password);
+      await resetFn(email, code, password);
       toast({ tone: 'success', title: 'Password changed', description: 'Please sign in with your new password.' });
       onBack();
     } catch (e) {

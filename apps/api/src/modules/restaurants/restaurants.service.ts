@@ -56,6 +56,34 @@ export class RestaurantsService {
     return { isOpen: r.status === RestaurantStatus.APPROVED && !r.isPaused, paused: r.isPaused };
   }
 
+  /** Owner edits their OWN restaurant profile (restaurantId comes from the JWT). */
+  async updateOwnProfile(
+    restaurantId: string,
+    dto: Partial<{
+      name: string;
+      description: string;
+      cuisine: string;
+      phone: string;
+      hours: string;
+      logoUrl: string;
+      coverUrl: string;
+    }>,
+  ) {
+    const r = await this.prisma.restaurant.update({
+      where: { id: restaurantId },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+        ...(dto.description !== undefined ? { description: dto.description.trim() || null } : {}),
+        ...(dto.cuisine !== undefined ? { cuisine: dto.cuisine.trim() || null } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone.trim() || null } : {}),
+        ...(dto.hours !== undefined ? { hours: dto.hours.trim() || null } : {}),
+        ...(dto.logoUrl !== undefined ? { logoUrl: dto.logoUrl.trim() || null } : {}),
+        ...(dto.coverUrl !== undefined ? { coverUrl: dto.coverUrl.trim() || null } : {}),
+      },
+    });
+    return { id: r.id, name: r.name, description: r.description, cuisine: r.cuisine, phone: r.phone, hours: r.hours, logoUrl: r.logoUrl, coverUrl: r.coverUrl };
+  }
+
   async search(query: string) {
     const campusId = await this.tenant.getDefaultCampusId();
     const q = query.trim();

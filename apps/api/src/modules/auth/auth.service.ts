@@ -208,6 +208,49 @@ export class AuthService {
     return { ok: true };
   }
 
+  // ── Restaurant owner: change / forgot / reset password ──────────────
+  async restaurantChangePassword(userId: string, oldPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.role !== UserRole.RESTAURANT || !user.passwordHash) {
+      throw new UnauthorizedException('Not allowed');
+    }
+    const ok = await bcrypt.compare(oldPassword, user.passwordHash);
+    if (!ok) throw new UnauthorizedException('Current password is incorrect.');
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+    return { ok: true };
+  }
+
+  async restaurantForgotPassword(email: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const normalized = email.toLowerCase().trim();
+    const user = await this.prisma.user.findFirst({
+      where: { campusId, email: normalized, role: UserRole.RESTAURANT },
+    });
+    if (user && user.status !== 'blocked') {
+      try {
+        await this.otp.issue(user.id, user.email, user.name);
+      } catch {
+        // Never leak account existence via errors.
+      }
+    }
+    return { sent: true };
+  }
+
+  async restaurantResetPassword(email: string, code: string, newPassword: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const normalized = email.toLowerCase().trim();
+    const user = await this.prisma.user.findFirst({
+      where: { campusId, email: normalized, role: UserRole.RESTAURANT },
+    });
+    if (!user) throw new BadRequestException('Invalid or expired OTP.');
+    await this.otp.verify(user.id, code);
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+    await this.tokens.revokeAll(user.id);
+    return { ok: true };
+  }
+
   // ── Restaurant / Admin: password ────────────────────────────────────
   async passwordLogin(email: string, password: string, role: UserRole) {
     const campusId = await this.tenant.getDefaultCampusId();

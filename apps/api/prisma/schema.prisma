@@ -191,6 +191,8 @@ model Restaurant {
   name              String
   description       String?
   cuisine           String?
+  phone             String?
+  hours             String? // e.g. "9:00 AM – 11:00 PM"
   logoUrl           String?
   coverUrl          String?
   status            RestaurantStatus @default(pending)

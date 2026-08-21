@@ -111,6 +111,30 @@ export async function adminResetPassword(
   });
 }
 
+// ── Restaurant owner: change / forgot / reset password ──────────────
+export async function restaurantChangePassword(
+  oldPassword: string,
+  newPassword: string,
+): Promise<{ ok: true }> {
+  return api.post('/auth/restaurant/change-password', { oldPassword, newPassword });
+}
+
+export async function restaurantForgotPassword(email: string): Promise<{ sent: true }> {
+  return api.post('/auth/restaurant/forgot-password', { email: email.trim().toLowerCase() });
+}
+
+export async function restaurantResetPassword(
+  email: string,
+  code: string,
+  password: string,
+): Promise<{ ok: true }> {
+  return api.post('/auth/restaurant/reset-password', {
+    email: email.trim().toLowerCase(),
+    code,
+    password,
+  });
+}
+
 export async function logout(): Promise<void> {
   try {
     await api.post('/auth/logout');

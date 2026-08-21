@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import {
   CartStatus,
   OrderStatus,
@@ -126,6 +127,127 @@ export class AdminService {
       target: r.name,
     });
     return { id: r.id, status: r.status, name: r.name };
+  }
+
+  // ── Restaurant account creation & management (admin only) ──
+  async createRestaurant(
+    user: AuthUser,
+    dto: {
+      name: string;
+      ownerEmail: string;
+      ownerName?: string;
+      password: string;
+      description?: string;
+      cuisine?: string;
+      phone?: string;
+      hours?: string;
+    },
+  ) {
+    const campusId = user.campusId;
+    const email = dto.ownerEmail.toLowerCase().trim();
+
+    const existing = await this.prisma.user.findFirst({ where: { campusId, email } });
+    if (existing) throw new BadRequestException('An account with this email already exists.');
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    // Owner login account + its restaurant, created together and linked 1:1.
+    const owner = await this.prisma.user.create({
+      data: {
+        campusId,
+        email,
+        role: UserRole.RESTAURANT,
+        name: dto.ownerName?.trim() || dto.name.trim(),
+        passwordHash,
+        verified: true, // admin-created accounts are pre-verified
+      },
+    });
+    const restaurant = await this.prisma.restaurant.create({
+      data: {
+        campusId,
+        ownerUserId: owner.id,
+        name: dto.name.trim(),
+        description: dto.description?.trim() || null,
+        cuisine: dto.cuisine?.trim() || null,
+        phone: dto.phone?.trim() || null,
+        hours: dto.hours?.trim() || null,
+        status: RestaurantStatus.APPROVED,
+        approvedByUserId: user.sub,
+      },
+    });
+    await this.audit.log({ ...this.actor(user), action: 'Created restaurant + owner', target: restaurant.name });
+    return { id: restaurant.id, name: restaurant.name, ownerEmail: owner.email, status: restaurant.status };
+  }
+
+  async updateRestaurant(
+    user: AuthUser,
+    id: string,
+    dto: Partial<{
+      name: string;
+      description: string;
+      cuisine: string;
+      phone: string;
+      hours: string;
+      logoUrl: string;
+      coverUrl: string;
+      prepTimeMin: number;
+      deliveryAvailable: boolean;
+      isPaused: boolean;
+    }>,
+  ) {
+    const r = await this.prisma.restaurant.findUnique({ where: { id } });
+    if (!r || r.deletedAt) throw new NotFoundException('Restaurant not found');
+    const updated = await this.prisma.restaurant.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+        ...(dto.description !== undefined ? { description: dto.description.trim() || null } : {}),
+        ...(dto.cuisine !== undefined ? { cuisine: dto.cuisine.trim() || null } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone.trim() || null } : {}),
+        ...(dto.hours !== undefined ? { hours: dto.hours.trim() || null } : {}),
+        ...(dto.logoUrl !== undefined ? { logoUrl: dto.logoUrl.trim() || null } : {}),
+        ...(dto.coverUrl !== undefined ? { coverUrl: dto.coverUrl.trim() || null } : {}),
+        ...(dto.prepTimeMin !== undefined ? { prepTimeMin: dto.prepTimeMin } : {}),
+        ...(dto.deliveryAvailable !== undefined ? { deliveryAvailable: dto.deliveryAvailable } : {}),
+        ...(dto.isPaused !== undefined ? { isPaused: dto.isPaused } : {}),
+      },
+    });
+    await this.audit.log({ ...this.actor(user), action: 'Edited restaurant', target: updated.name });
+    return { id: updated.id, name: updated.name, status: updated.status };
+  }
+
+  async resetRestaurantPassword(user: AuthUser, id: string, newPassword: string) {
+    const r = await this.prisma.restaurant.findUnique({ where: { id } });
+    if (!r || !r.ownerUserId) throw new NotFoundException('Restaurant owner not found');
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id: r.ownerUserId }, data: { passwordHash } });
+    // Old password + existing sessions stop working immediately.
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: r.ownerUserId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    await this.audit.log({ ...this.actor(user), action: 'Force-reset restaurant password', target: r.name });
+    return { ok: true };
+  }
+
+  async setRestaurantOwnerStatus(user: AuthUser, id: string, active: boolean) {
+    const r = await this.prisma.restaurant.findUnique({ where: { id } });
+    if (!r || !r.ownerUserId) throw new NotFoundException('Restaurant owner not found');
+    await this.prisma.user.update({
+      where: { id: r.ownerUserId },
+      data: { status: active ? UserStatus.ACTIVE : UserStatus.BLOCKED },
+    });
+    if (!active) {
+      await this.prisma.refreshToken.updateMany({
+        where: { userId: r.ownerUserId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
+    await this.audit.log({
+      ...this.actor(user),
+      action: active ? 'Enabled restaurant owner' : 'Disabled restaurant owner',
+      target: r.name,
+    });
+    return { id: r.id, ownerActive: active };
   }
 
   // ── Students ──
