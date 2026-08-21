@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, GraduationCap, IdCard, KeyRound, Mail, ShieldCheck, User } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, GraduationCap, IdCard, KeyRound, Mail, ShieldCheck, User } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Field, Input, cn, toast } from '@campus-bytes/ui';
@@ -28,6 +28,45 @@ const RESEND_SECONDS = 45;
 
 function errMessage(e: unknown): string {
   return e instanceof ApiError ? e.message : 'Something went wrong. Please try again.';
+}
+
+/** Password field with a show/hide (eye) toggle. */
+function PasswordInput({
+  id,
+  value,
+  onChange,
+  placeholder,
+  autoFocus,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  autoFocus?: boolean;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+      <Input
+        id={id}
+        type={show ? 'text' : 'password'}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="pl-9 pr-10"
+        autoFocus={autoFocus}
+      />
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        aria-label={show ? 'Hide password' : 'Show password'}
+        className="absolute right-2.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-ink-400 hover:text-ink-700"
+      >
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  );
 }
 
 function LoginInner() {
@@ -167,17 +206,7 @@ function LoginForm({ onDone, onForgot }: { onDone: () => void; onForgot: () => v
         </div>
       </Field>
       <Field label="Password" htmlFor="login-password" error={error ?? undefined}>
-        <div className="relative">
-          <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <Input
-            id="login-password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            className="pl-9"
-          />
-        </div>
+        <PasswordInput id="login-password" value={password} onChange={setPassword} placeholder="••••••••" />
       </Field>
       <Button type="submit" block size="lg" loading={busy} disabled={!valid}>
         Log In <ArrowRight className="h-4 w-4" />
@@ -272,10 +301,7 @@ function SignupForm({ onSent }: { onSent: (email: string) => void }) {
         htmlFor="signup-password"
         error={passwordTooShort ? 'Password must be at least 8 characters.' : undefined}
       >
-        <div className="relative">
-          <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <Input id="signup-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" className="pl-9" />
-        </div>
+        <PasswordInput id="signup-password" value={password} onChange={setPassword} placeholder="At least 8 characters" />
       </Field>
 
       <Field
@@ -283,10 +309,7 @@ function SignupForm({ onSent }: { onSent: (email: string) => void }) {
         htmlFor="signup-confirm"
         error={mismatch ? 'Passwords do not match.' : (error ?? undefined)}
       >
-        <div className="relative">
-          <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <Input id="signup-confirm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Re-enter your password" className="pl-9" />
-        </div>
+        <PasswordInput id="signup-confirm" value={confirm} onChange={setConfirm} placeholder="Re-enter your password" />
       </Field>
 
       <Button type="submit" block size="lg" loading={busy} disabled={!valid}>
@@ -415,16 +438,10 @@ function ForgotPasswordFlow({ onBack }: { onBack: () => void }) {
         />
       </Field>
       <Field label="New password" htmlFor="fp-password" error={passwordTooShort ? 'Password must be at least 8 characters.' : undefined}>
-        <div className="relative">
-          <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <Input id="fp-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" className="pl-9" />
-        </div>
+        <PasswordInput id="fp-password" value={password} onChange={setPassword} placeholder="At least 8 characters" />
       </Field>
       <Field label="Confirm new password" htmlFor="fp-confirm" error={mismatch ? 'Passwords do not match.' : (error ?? undefined)}>
-        <div className="relative">
-          <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <Input id="fp-confirm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Re-enter your password" className="pl-9" />
-        </div>
+        <PasswordInput id="fp-confirm" value={confirm} onChange={setConfirm} placeholder="Re-enter your password" />
       </Field>
       <Button type="submit" block size="lg" loading={busy} disabled={!canReset}>
         Reset password
@@ -581,10 +598,7 @@ function PasswordAuth({ mode, onDone }: { mode: 'restaurant' | 'admin'; onDone: 
         </div>
       </Field>
       <Field label="Password" htmlFor="pw" error={error ?? undefined}>
-        <div className="relative">
-          <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="pl-9" />
-        </div>
+        <PasswordInput id="pw" value={password} onChange={setPassword} placeholder="••••••••" />
       </Field>
       <Button type="submit" block size="lg" loading={busy} disabled={!email.includes('@') || !password}>
         {mode === 'admin' ? (
