@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Field, Input, Modal, Select, Textarea, cn } from '@campus-bytes/ui';
 import {
@@ -33,6 +33,19 @@ export function DeliveryLocationPicker({
   const [roomNo, setRoomNo] = useState<string>(current?.roomNo ?? '');
   const [instructions, setInstructions] = useState<string>(current?.instructions ?? '');
   const [error, setError] = useState<string | null>(null);
+
+  // Re-sync the form to the saved location every time it opens, so a student's
+  // previously saved hostel + room number always reappear (the profile may load
+  // after this component first mounts, so initial state alone isn't enough).
+  useEffect(() => {
+    if (open) {
+      setType(current?.type ?? 'hostel');
+      setName(current?.name ?? '');
+      setRoomNo(current?.roomNo ?? '');
+      setInstructions(current?.instructions ?? '');
+      setError(null);
+    }
+  }, [open, current]);
 
   const options = CAMPUS_DELIVERY_LOCATIONS[type];
   const needsRoom = locationTypeRequiresRoom(type);
