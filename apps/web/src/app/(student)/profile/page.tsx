@@ -94,7 +94,7 @@ export default function ProfilePage() {
         <LogOut className="h-4 w-4" /> Log out
       </Button>
 
-      <p className="pb-4 text-center text-2xs text-ink-400">Campus Bytes · v0.1 · NIMS University</p>
+      <p className="pb-4 text-center text-2xs text-ink-400">CampusBytes · v0.1 · NIMS University</p>
     </div>
   );
 }

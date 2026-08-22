@@ -17,17 +17,21 @@ export function Sidebar({
   items,
   panelLabel,
   footer,
+  homeHref = '/',
 }: {
   items: NavItem[];
   panelLabel: string;
   footer?: React.ReactNode;
+  homeHref?: string;
 }) {
   const pathname = usePathname();
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-line bg-surface md:flex">
       <div className="flex items-center gap-2 px-5 py-5">
-        <Logo size={30} />
+        <Link href={homeHref} aria-label="CampusBytes home">
+          <Logo size={30} />
+        </Link>
       </div>
       <p className="px-5 pb-2 text-2xs font-semibold uppercase tracking-wider text-ink-400">
         {panelLabel}

@@ -10,7 +10,7 @@ export function RestaurantChrome({ children }: { children: React.ReactNode }) {
   return (
     <RequireRole role="restaurant">
     <div className="flex min-h-dvh bg-surface-cream">
-      <Sidebar items={RESTAURANT_NAV} panelLabel="Restaurant" />
+      <Sidebar items={RESTAURANT_NAV} panelLabel="Restaurant" homeHref="/r" />
       <div className="flex min-w-0 flex-1 flex-col">
         <RestaurantTopBar />
         <MobileNavRail items={RESTAURANT_NAV} />

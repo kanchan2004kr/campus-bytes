@@ -24,6 +24,7 @@ export function AdminChrome({ children }: { children: React.ReactNode }) {
       <Sidebar
         items={nav}
         panelLabel="Admin"
+        homeHref="/admin"
         footer={
           <div className="flex items-center gap-2 rounded-md bg-surface-cream px-3 py-2 text-xs text-ink-600">
             <ShieldCheck className="h-4 w-4 text-success" />

@@ -24,9 +24,8 @@ export function StudentTopBar() {
     <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur">
       <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-6">
         <div className="flex min-w-0 items-center gap-4">
-          <Link href="/" aria-label="Campus Bytes home">
-            <Logo showWordmark={false} size={30} className="md:hidden" />
-            <Logo size={30} className="hidden md:inline-flex" />
+          <Link href="/" aria-label="CampusBytes home">
+            <Logo size={30} />
           </Link>
 
           {/* Display-only delivery address (no form/modal on Home). */}

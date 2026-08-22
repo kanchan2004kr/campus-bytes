@@ -3,7 +3,7 @@ import { AdminChrome } from '@/components/admin/chrome';
 import { RequireRole } from '@/components/auth/require-role';
 
 export const metadata: Metadata = {
-  title: { default: 'Admin', template: '%s · Campus Bytes Admin' },
+  title: { default: 'Admin', template: '%s · CampusBytes Admin' },
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
