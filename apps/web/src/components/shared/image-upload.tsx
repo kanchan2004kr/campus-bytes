@@ -7,10 +7,10 @@ import { cn } from '@campus-bytes/ui';
 import { uploadImage } from '@/lib/cloudinary';
 
 /**
- * Reusable image uploader. Uploads directly to Cloudinary (unsigned) and returns
- * the hosted URL via onChange. Shows a live preview; validates type/size in the
- * upload helper. When Cloudinary isn't configured yet it degrades to a disabled
- * state with a hint (no crash).
+ * Reusable image uploader. Sends the picked file to our backend (which uploads
+ * to Cloudinary server-side) and returns the hosted URL via onChange. Shows a
+ * live preview; validates type/size in the upload helper and surfaces the
+ * server's error message if the upload fails.
  */
 export function ImageUpload({
   value,
