@@ -71,6 +71,68 @@ export class StudentResendDto {
   email!: string;
 }
 
+// ── Approved-student gated registration ──────────────────────────────
+export class CheckStudentIdDto {
+  @IsString({ message: 'Student ID is required' })
+  @MinLength(3, { message: 'Enter a valid Student ID' })
+  @MaxLength(40)
+  studentId!: string;
+}
+
+export class RegisterSendOtpDto {
+  @IsString({ message: 'Student ID is required' })
+  @MinLength(3, { message: 'Enter a valid Student ID' })
+  @MaxLength(40)
+  studentId!: string;
+
+  @IsEmail({}, { message: 'Enter a valid email address' })
+  email!: string;
+}
+
+export class RegisterVerifyDto {
+  @IsString() @MinLength(3) @MaxLength(40)
+  studentId!: string;
+
+  @IsEmail({}, { message: 'Enter a valid email address' })
+  email!: string;
+
+  @Matches(/^\d{6}$/, { message: 'OTP must be 6 digits' })
+  code!: string;
+}
+
+export class RegisterCompleteDto {
+  @IsString() @MinLength(3) @MaxLength(40)
+  studentId!: string;
+
+  @IsEmail({}, { message: 'Enter a valid email address' })
+  email!: string;
+
+  @IsString({ message: 'Password is required' })
+  @MinLength(8, { message: 'Password must be at least 8 characters' })
+  @MaxLength(72, { message: 'Password is too long' })
+  password!: string;
+}
+
+export class StudentForgotByIdDto {
+  @IsString({ message: 'Student ID is required' })
+  @MinLength(3, { message: 'Enter a valid Student ID' })
+  @MaxLength(40)
+  studentId!: string;
+}
+
+export class StudentResetByIdDto {
+  @IsString() @MinLength(3) @MaxLength(40)
+  studentId!: string;
+
+  @Matches(/^\d{6}$/, { message: 'OTP must be 6 digits' })
+  code!: string;
+
+  @IsString({ message: 'Password is required' })
+  @MinLength(8, { message: 'Password must be at least 8 characters' })
+  @MaxLength(72, { message: 'Password is too long' })
+  password!: string;
+}
+
 export class OtpVerifyDto {
   @IsEmail({}, { message: 'Enter a valid email address' })
   email!: string;

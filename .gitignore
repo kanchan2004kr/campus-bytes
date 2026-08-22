@@ -36,3 +36,4 @@ apps/api/prisma/*.db
 coverage/
 playwright-report/
 test-results/
+scripts/

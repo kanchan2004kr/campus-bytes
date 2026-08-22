@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Eye, EyeOff, GraduationCap, IdCard, KeyRound, Mail, ShieldCheck, User } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, IdCard, KeyRound, Mail, ShieldCheck, User } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Field, Input, cn, toast } from '@campus-bytes/ui';
@@ -10,15 +10,17 @@ import {
   adminForgotPassword,
   adminLogin,
   adminResetPassword,
+  checkStudentId,
+  registerComplete,
+  registerSendOtp,
+  registerVerifyOtp,
   restaurantForgotPassword,
   restaurantLogin,
   restaurantResetPassword,
-  studentForgotPassword,
+  studentForgotById,
   studentLogin,
-  studentResendOtp,
-  studentResetPassword,
-  studentSignup,
-  studentVerifyOtp,
+  studentResetById,
+  type CheckIdResult,
 } from '@/lib/auth-api';
 
 type Role = 'student' | 'restaurant' | 'admin';
@@ -124,17 +126,12 @@ function LoginInner() {
   );
 }
 
-/* ─────────────────────────── Student (password auth) ─────────────────────────── */
+/* ─────────────────────────── Student (Student ID + password) ─────────────────────────── */
 function StudentAuth({ onDone }: { onDone: () => void }) {
   const [view, setView] = useState<'login' | 'signup' | 'forgot'>('login');
-  const [pendingEmail, setPendingEmail] = useState<string | null>(null); // signup verification
-
-  if (pendingEmail) {
-    return <OtpStep email={pendingEmail} onBack={() => setPendingEmail(null)} onVerified={onDone} />;
-  }
 
   if (view === 'forgot') {
-    return <ForgotPasswordFlow onBack={() => setView('login')} />;
+    return <StudentForgotFlow onBack={() => setView('login')} />;
   }
 
   return (
@@ -157,25 +154,26 @@ function StudentAuth({ onDone }: { onDone: () => void }) {
       {view === 'login' ? (
         <LoginForm onDone={onDone} onForgot={() => setView('forgot')} />
       ) : (
-        <SignupForm onSent={setPendingEmail} />
+        <RegisterFlow onDone={onDone} />
       )}
     </div>
   );
 }
 
+/** Student login: Student ID + password (no OTP). */
 function LoginForm({ onDone, onForgot }: { onDone: () => void; onForgot: () => void }) {
-  const [identifier, setIdentifier] = useState('');
+  const [studentId, setStudentId] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const valid = identifier.trim().length >= 3 && password.length >= 1;
+  const valid = studentId.trim().length >= 3 && password.length >= 1;
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      await studentLogin(identifier, password);
+      await studentLogin(studentId, password);
       onDone();
     } catch (e) {
       setError(errMessage(e));
@@ -194,17 +192,18 @@ function LoginForm({ onDone, onForgot }: { onDone: () => void; onForgot: () => v
     >
       <div>
         <h2 className="font-display text-lg font-semibold text-ink-900">Welcome back</h2>
-        <p className="text-sm text-ink-600">Log in with your email or Student ID and password.</p>
+        <p className="text-sm text-ink-600">Log in with your Student ID and password.</p>
       </div>
-      <Field label="Email or Student ID" htmlFor="identifier">
+      <Field label="Student ID" htmlFor="login-studentid">
         <div className="relative">
-          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+          <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
           <Input
-            id="identifier"
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            placeholder="you@nims.edu or NIMS2023xxxx"
+            id="login-studentid"
+            value={studentId}
+            onChange={(e) => setStudentId(e.target.value)}
+            placeholder="2026COMP0003"
             className="pl-9"
+            autoCapitalize="characters"
             autoFocus
           />
         </div>
@@ -213,7 +212,7 @@ function LoginForm({ onDone, onForgot }: { onDone: () => void; onForgot: () => v
         <PasswordInput id="login-password" value={password} onChange={setPassword} placeholder="••••••••" />
       </Field>
       <Button type="submit" block size="lg" loading={busy} disabled={!valid}>
-        Log In <ArrowRight className="h-4 w-4" />
+        Sign In <ArrowRight className="h-4 w-4" />
       </Button>
       <button
         type="button"
@@ -226,106 +225,17 @@ function LoginForm({ onDone, onForgot }: { onDone: () => void; onForgot: () => v
   );
 }
 
-function SignupForm({ onSent }: { onSent: (email: string) => void }) {
-  const [name, setName] = useState('');
+/**
+ * Approved-roster gated registration:
+ *  Student ID (auto-checked) → name auto-fills (read-only) → email → Send OTP →
+ *  Verify OTP → Create Password → account created + logged in.
+ */
+function RegisterFlow({ onDone }: { onDone: () => void }) {
+  type Step = 'id' | 'otp' | 'password';
+  const [step, setStep] = useState<Step>('id');
   const [studentId, setStudentId] = useState('');
-  const [course, setCourse] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const passwordTooShort = password.length > 0 && password.length < 8;
-  const mismatch = confirm.length > 0 && confirm !== password;
-  const valid =
-    name.trim().length >= 2 &&
-    studentId.trim().length >= 3 &&
-    course.trim().length >= 2 &&
-    email.includes('@') &&
-    password.length >= 8 &&
-    confirm === password;
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await studentSignup({ name, studentId, course, email, password });
-      onSent(res.email);
-    } catch (e) {
-      setError(errMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (valid) submit();
-      }}
-      className="flex flex-col gap-4"
-    >
-      <div>
-        <h2 className="font-display text-lg font-semibold text-ink-900">Create your student account</h2>
-        <p className="text-sm text-ink-600">We’ll verify your email with a one-time code.</p>
-      </div>
-
-      <Field label="Full Name" htmlFor="fullName">
-        <div className="relative">
-          <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <Input id="fullName" value={name} onChange={(e) => setName(e.target.value)} placeholder="Kanchan Yadav" className="pl-9" autoFocus />
-        </div>
-      </Field>
-
-      <Field label="Student ID" htmlFor="studentId">
-        <div className="relative">
-          <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <Input id="studentId" value={studentId} onChange={(e) => setStudentId(e.target.value)} placeholder="NIMS2023CS047" className="pl-9" />
-        </div>
-      </Field>
-
-      <Field label="Course / Program" htmlFor="course">
-        <div className="relative">
-          <GraduationCap className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <Input id="course" value={course} onChange={(e) => setCourse(e.target.value)} placeholder="B.Tech Computer Science" className="pl-9" />
-        </div>
-      </Field>
-
-      <Field label="Email address" htmlFor="signup-email">
-        <div className="relative">
-          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <Input id="signup-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@nims.edu" className="pl-9" />
-        </div>
-      </Field>
-
-      <Field
-        label="Password"
-        htmlFor="signup-password"
-        error={passwordTooShort ? 'Password must be at least 8 characters.' : undefined}
-      >
-        <PasswordInput id="signup-password" value={password} onChange={setPassword} placeholder="At least 8 characters" />
-      </Field>
-
-      <Field
-        label="Confirm Password"
-        htmlFor="signup-confirm"
-        error={mismatch ? 'Passwords do not match.' : (error ?? undefined)}
-      >
-        <PasswordInput id="signup-confirm" value={confirm} onChange={setConfirm} placeholder="Re-enter your password" />
-      </Field>
-
-      <Button type="submit" block size="lg" loading={busy} disabled={!valid}>
-        Create Account <ArrowRight className="h-4 w-4" />
-      </Button>
-    </form>
-  );
-}
-
-/* Forgot password: email → OTP + new password → reset. */
-function ForgotPasswordFlow({ onBack }: { onBack: () => void }) {
-  const [step, setStep] = useState<'email' | 'reset'>('email');
+  const [name, setName] = useState('');
+  const [idState, setIdState] = useState<'idle' | 'checking' | CheckIdResult['status']>('idle');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
@@ -340,27 +250,40 @@ function ForgotPasswordFlow({ onBack }: { onBack: () => void }) {
     if (timer.current) clearInterval(timer.current);
     timer.current = setInterval(() => {
       setLeft((s) => {
-        if (s <= 1 && timer.current) {
-          clearInterval(timer.current);
-          return 0;
-        }
+        if (s <= 1 && timer.current) { clearInterval(timer.current); return 0; }
         return s - 1;
       });
     }, 1000);
   }, []);
+  useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
 
-  useEffect(() => () => {
-    if (timer.current) clearInterval(timer.current);
-  }, []);
+  // Auto-check the Student ID (debounced) — no separate "Continue" button.
+  useEffect(() => {
+    const id = studentId.trim();
+    setName('');
+    setError(null);
+    if (id.length < 3) { setIdState('idle'); return; }
+    setIdState('checking');
+    const t = setTimeout(async () => {
+      try {
+        const res = await checkStudentId(id);
+        setIdState(res.status);
+        if (res.status === 'ok') setName(res.name);
+      } catch {
+        setIdState('idle');
+      }
+    }, 450);
+    return () => clearTimeout(t);
+  }, [studentId]);
 
-  const sendCode = async () => {
+  const sendOtp = async () => {
     setBusy(true);
     setError(null);
     try {
-      await studentForgotPassword(email);
-      setStep('reset');
+      await registerSendOtp(studentId, email);
+      setStep('otp');
       startCountdown();
-      toast({ tone: 'success', title: 'Check your email', description: `If ${email} is registered, a code is on its way.` });
+      toast({ tone: 'success', title: 'OTP sent', description: `Check ${email} for your code.` });
     } catch (e) {
       setError(errMessage(e));
     } finally {
@@ -368,7 +291,206 @@ function ForgotPasswordFlow({ onBack }: { onBack: () => void }) {
     }
   };
 
-  const passwordTooShort = password.length > 0 && password.length < 8;
+  const verifyOtp = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await registerVerifyOtp(studentId, email, code);
+      setStep('password');
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const complete = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await registerComplete(studentId, email, password);
+      toast({ tone: 'success', title: 'Account created', description: 'Welcome to CampusBytes!' });
+      onDone();
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ── Step 3: password ──
+  if (step === 'password') {
+    const tooShort = password.length > 0 && password.length < 8;
+    const mismatch = confirm.length > 0 && confirm !== password;
+    const canCreate = password.length >= 8 && confirm === password;
+    return (
+      <form onSubmit={(e) => { e.preventDefault(); if (canCreate) complete(); }} className="flex flex-col gap-4">
+        <div>
+          <h2 className="font-display text-lg font-semibold text-ink-900">Create your password</h2>
+          <p className="text-sm text-ink-600">Email verified. Set a password to finish.</p>
+        </div>
+        <Field label="Create Password" htmlFor="reg-pw" error={tooShort ? 'Password must be at least 8 characters.' : undefined}>
+          <PasswordInput id="reg-pw" value={password} onChange={setPassword} placeholder="At least 8 characters" autoFocus />
+        </Field>
+        <Field label="Confirm Password" htmlFor="reg-confirm" error={mismatch ? 'Passwords do not match.' : (error ?? undefined)}>
+          <PasswordInput id="reg-confirm" value={confirm} onChange={setConfirm} placeholder="Re-enter your password" />
+        </Field>
+        <Button type="submit" block size="lg" loading={busy} disabled={!canCreate}>
+          Create Account <ArrowRight className="h-4 w-4" />
+        </Button>
+      </form>
+    );
+  }
+
+  // ── Step 2: OTP ──
+  if (step === 'otp') {
+    return (
+      <form onSubmit={(e) => { e.preventDefault(); if (code.length === 6) verifyOtp(); }} className="flex flex-col gap-4">
+        <div>
+          <h2 className="font-display text-lg font-semibold text-ink-900">Verify your email</h2>
+          <p className="text-sm text-ink-600">
+            Enter the 6-digit code sent to <span className="font-medium text-ink-900">{email}</span>.
+          </p>
+        </div>
+        <Field label="Enter OTP" htmlFor="reg-otp" error={error ?? undefined}>
+          <Input
+            id="reg-otp"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="••••••"
+            className="text-center text-lg tracking-[0.4em]"
+            autoFocus
+          />
+        </Field>
+        <Button type="submit" block size="lg" loading={busy} disabled={code.length !== 6}>
+          Verify OTP
+        </Button>
+        <div className="flex items-center justify-between text-xs">
+          <button type="button" onClick={() => { setStep('id'); setCode(''); }} className="text-ink-500 hover:text-ink-700">
+            ← Change email
+          </button>
+          {left > 0 ? (
+            <span className="text-ink-400">Resend in 0:{String(left).padStart(2, '0')}</span>
+          ) : (
+            <button type="button" onClick={sendOtp} className="font-medium text-brand-600 hover:text-brand-700">
+              Resend OTP
+            </button>
+          )}
+        </div>
+      </form>
+    );
+  }
+
+  // ── Step 1: Student ID → name → email → Send OTP ──
+  const idOk = idState === 'ok';
+  const canSend = idOk && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (canSend) sendOtp(); }} className="flex flex-col gap-4">
+      <div>
+        <h2 className="font-display text-lg font-semibold text-ink-900">Create your student account</h2>
+        <p className="text-sm text-ink-600">Registration is for authorized NIMS students only.</p>
+      </div>
+
+      <Field
+        label="Student ID"
+        htmlFor="reg-studentid"
+        error={
+          idState === 'not_found'
+            ? 'Student ID not found. Registration is available only for authorized NIMS students.'
+            : idState === 'already_registered'
+              ? 'This Student ID is already registered. Please sign in instead.'
+              : undefined
+        }
+      >
+        <div className="relative">
+          <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+          <Input
+            id="reg-studentid"
+            value={studentId}
+            onChange={(e) => setStudentId(e.target.value)}
+            placeholder="2026COMP0003"
+            className="pl-9"
+            autoCapitalize="characters"
+            autoFocus
+          />
+          {idState === 'checking' && (
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-2xs text-ink-400">Checking…</span>
+          )}
+        </div>
+      </Field>
+
+      {/* Name auto-populates from the approved roster; read-only. */}
+      <Field label="Name" htmlFor="reg-name">
+        <div className="relative">
+          <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+          <Input
+            id="reg-name"
+            value={name}
+            readOnly
+            placeholder={idOk ? '' : 'Auto-filled after a valid Student ID'}
+            className="pl-9 bg-surface-cream/60 text-ink-700"
+            tabIndex={-1}
+          />
+        </div>
+      </Field>
+
+      {idOk && (
+        <Field label="Student Email" htmlFor="reg-email" error={error ?? undefined}>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+            <Input id="reg-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@gmail.com" className="pl-9" autoFocus />
+          </div>
+        </Field>
+      )}
+
+      <Button type="submit" block size="lg" loading={busy} disabled={!canSend}>
+        Send OTP <ArrowRight className="h-4 w-4" />
+      </Button>
+    </form>
+  );
+}
+
+/* Forgot password (student): Student ID → OTP to registered email → new password. */
+function StudentForgotFlow({ onBack }: { onBack: () => void }) {
+  const [step, setStep] = useState<'id' | 'reset'>('id');
+  const [studentId, setStudentId] = useState('');
+  const [maskedEmail, setMaskedEmail] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [left, setLeft] = useState(0);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startCountdown = useCallback(() => {
+    setLeft(RESEND_SECONDS);
+    if (timer.current) clearInterval(timer.current);
+    timer.current = setInterval(() => {
+      setLeft((s) => { if (s <= 1 && timer.current) { clearInterval(timer.current); return 0; } return s - 1; });
+    }, 1000);
+  }, []);
+  useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
+
+  const sendCode = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await studentForgotById(studentId);
+      setMaskedEmail(res.email ?? null);
+      setStep('reset');
+      startCountdown();
+      toast({ tone: 'success', title: 'Check your email', description: res.email ? `A code was sent to ${res.email}.` : 'If the Student ID is registered, a code is on its way.' });
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const tooShort = password.length > 0 && password.length < 8;
   const mismatch = confirm.length > 0 && confirm !== password;
   const canReset = code.length === 6 && password.length >= 8 && confirm === password;
 
@@ -376,7 +498,7 @@ function ForgotPasswordFlow({ onBack }: { onBack: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await studentResetPassword(email, code, password);
+      await studentResetById(studentId, code, password);
       toast({ tone: 'success', title: 'Password changed', description: 'Please log in with your new password.' });
       onBack();
     } catch (e) {
@@ -386,26 +508,20 @@ function ForgotPasswordFlow({ onBack }: { onBack: () => void }) {
     }
   };
 
-  if (step === 'email') {
+  if (step === 'id') {
     return (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (email.includes('@')) sendCode();
-        }}
-        className="flex flex-col gap-4"
-      >
+      <form onSubmit={(e) => { e.preventDefault(); if (studentId.trim().length >= 3) sendCode(); }} className="flex flex-col gap-4">
         <div>
           <h2 className="font-display text-lg font-semibold text-ink-900">Reset your password</h2>
-          <p className="text-sm text-ink-600">Enter your registered email and we’ll send a verification code.</p>
+          <p className="text-sm text-ink-600">Enter your Student ID — we’ll send a code to your registered email.</p>
         </div>
-        <Field label="Email address" htmlFor="fp-email" error={error ?? undefined}>
+        <Field label="Student ID" htmlFor="fp-studentid" error={error ?? undefined}>
           <div className="relative">
-            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-            <Input id="fp-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@nims.edu" className="pl-9" autoFocus />
+            <IdCard className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+            <Input id="fp-studentid" value={studentId} onChange={(e) => setStudentId(e.target.value)} placeholder="2026COMP0003" className="pl-9" autoCapitalize="characters" autoFocus />
           </div>
         </Field>
-        <Button type="submit" block size="lg" loading={busy} disabled={!email.includes('@')}>
+        <Button type="submit" block size="lg" loading={busy} disabled={studentId.trim().length < 3}>
           Send code <ArrowRight className="h-4 w-4" />
         </Button>
         <button type="button" onClick={onBack} className="text-center text-sm text-ink-500 hover:text-ink-700">
@@ -416,32 +532,17 @@ function ForgotPasswordFlow({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (canReset) reset();
-      }}
-      className="flex flex-col gap-4"
-    >
+    <form onSubmit={(e) => { e.preventDefault(); if (canReset) reset(); }} className="flex flex-col gap-4">
       <div>
         <h2 className="font-display text-lg font-semibold text-ink-900">Create a new password</h2>
         <p className="text-sm text-ink-600">
-          Enter the 6-digit code sent to <span className="font-medium text-ink-900">{email}</span>.
+          Enter the 6-digit code{maskedEmail ? <> sent to <span className="font-medium text-ink-900">{maskedEmail}</span></> : ' sent to your registered email'}.
         </p>
       </div>
       <Field label="Verification code" htmlFor="fp-code">
-        <Input
-          id="fp-code"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          placeholder="••••••"
-          className="text-center text-lg tracking-[0.4em]"
-          autoFocus
-        />
+        <Input id="fp-code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••••" className="text-center text-lg tracking-[0.4em]" autoFocus />
       </Field>
-      <Field label="New password" htmlFor="fp-password" error={passwordTooShort ? 'Password must be at least 8 characters.' : undefined}>
+      <Field label="New password" htmlFor="fp-password" error={tooShort ? 'Password must be at least 8 characters.' : undefined}>
         <PasswordInput id="fp-password" value={password} onChange={setPassword} placeholder="At least 8 characters" />
       </Field>
       <Field label="Confirm new password" htmlFor="fp-confirm" error={mismatch ? 'Passwords do not match.' : (error ?? undefined)}>
@@ -451,116 +552,11 @@ function ForgotPasswordFlow({ onBack }: { onBack: () => void }) {
         Reset password
       </Button>
       <div className="flex items-center justify-between text-xs">
-        <button type="button" onClick={onBack} className="text-ink-500 hover:text-ink-700">
-          ← Back to log in
-        </button>
+        <button type="button" onClick={onBack} className="text-ink-500 hover:text-ink-700">← Back to log in</button>
         {left > 0 ? (
           <span className="text-ink-400">Resend in 0:{String(left).padStart(2, '0')}</span>
         ) : (
-          <button type="button" onClick={sendCode} className="font-medium text-brand-600 hover:text-brand-700">
-            Resend code
-          </button>
-        )}
-      </div>
-    </form>
-  );
-}
-
-function OtpStep({ email, onBack, onVerified }: { email: string; onBack: () => void; onVerified: () => void }) {
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [left, setLeft] = useState(RESEND_SECONDS);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startCountdown = useCallback(() => {
-    setLeft(RESEND_SECONDS);
-    if (timer.current) clearInterval(timer.current);
-    timer.current = setInterval(() => {
-      setLeft((s) => {
-        if (s <= 1 && timer.current) {
-          clearInterval(timer.current);
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-  }, []);
-
-  useEffect(() => {
-    startCountdown();
-    return () => {
-      if (timer.current) clearInterval(timer.current);
-    };
-  }, [startCountdown]);
-
-  const verify = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await studentVerifyOtp(email, code);
-      onVerified();
-    } catch (e) {
-      setError(errMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const resend = async () => {
-    setError(null);
-    try {
-      await studentResendOtp(email);
-      startCountdown();
-      setCode('');
-      toast({ tone: 'success', title: 'New code sent', description: `Check ${email}.` });
-    } catch (e) {
-      toast({ tone: 'error', title: 'Could not resend', description: errMessage(e) });
-    }
-  };
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (code.length === 6) verify();
-      }}
-      className="flex flex-col gap-4"
-    >
-      <div>
-        <h2 className="font-display text-lg font-semibold text-ink-900">Verify your email</h2>
-        <p className="text-sm text-ink-600">
-          Enter the 6-digit code sent to <span className="font-medium text-ink-900">{email}</span>.
-        </p>
-      </div>
-
-      <Field label="Verification code" htmlFor="otp" error={error ?? undefined}>
-        <Input
-          id="otp"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          placeholder="••••••"
-          className="text-center text-lg tracking-[0.4em]"
-          autoFocus
-        />
-      </Field>
-
-      <Button type="submit" block size="lg" loading={busy} disabled={code.length !== 6}>
-        Verify & continue
-      </Button>
-
-      <div className="flex items-center justify-between text-xs">
-        <button type="button" onClick={onBack} className="text-ink-500 hover:text-ink-700">
-          ← Use a different account
-        </button>
-        {left > 0 ? (
-          <span className="text-ink-400">Resend in 0:{String(left).padStart(2, '0')}</span>
-        ) : (
-          <button type="button" onClick={resend} className="font-medium text-brand-600 hover:text-brand-700">
-            Resend OTP
-          </button>
+          <button type="button" onClick={sendCode} className="font-medium text-brand-600 hover:text-brand-700">Resend code</button>
         )}
       </div>
     </form>

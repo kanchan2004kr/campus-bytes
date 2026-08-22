@@ -155,6 +155,59 @@ export class AdminService {
     };
   }
 
+  // ── Approved-student roster (registration source of truth) ──────────
+  async approvedStudentsCount(campusId: string) {
+    const total = await this.prisma.approvedStudent.count({ where: { campusId } });
+    return { total };
+  }
+
+  /**
+   * Import approved students from CSV text ("studentId,studentName" per line).
+   * Additive & idempotent: existing IDs are updated (name), new IDs inserted.
+   * Never creates user accounts. Returns counts + a sample of invalid rows.
+   */
+  async importApprovedStudents(user: AuthUser, csv: string) {
+    const campusId = user.campusId;
+    const lines = csv.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    // Drop a header row if present.
+    if (lines[0] && /student\s*id/i.test(lines[0]) && /name/i.test(lines[0])) lines.shift();
+
+    const ID_RE = /^\d{4}[A-Z]{2,6}\d{3,5}$/;
+    const seen = new Set<string>();
+    const valid: { studentId: string; name: string }[] = [];
+    const invalidRows: string[] = [];
+    let duplicates = 0;
+
+    for (const line of lines) {
+      // Split first comma only; allow quoted names.
+      const idx = line.indexOf(',');
+      if (idx < 0) { if (invalidRows.length < 25) invalidRows.push(line); continue; }
+      const studentId = line.slice(0, idx).trim().toUpperCase().replace(/\s+/g, '');
+      let name = line.slice(idx + 1).trim().replace(/^"|"$/g, '').replace(/""/g, '"').replace(/\s+/g, ' ');
+      if (!ID_RE.test(studentId) || !name) { if (invalidRows.length < 25) invalidRows.push(line); continue; }
+      if (seen.has(studentId)) { duplicates++; continue; }
+      seen.add(studentId);
+      valid.push({ studentId, name });
+    }
+
+    // Upsert in chunks so large imports don't exhaust the pool.
+    let inserted = 0;
+    let updated = 0;
+    for (const row of valid) {
+      const res = await this.prisma.approvedStudent.upsert({
+        where: { campusId_studentId: { campusId, studentId: row.studentId } },
+        create: { campusId, studentId: row.studentId, name: row.name },
+        update: { name: row.name },
+      });
+      // upsert doesn't tell us which path ran; approximate via createdAt≈updatedAt.
+      if (Math.abs(res.createdAt.getTime() - res.updatedAt.getTime()) < 1000) inserted++;
+      else updated++;
+    }
+    const total = await this.prisma.approvedStudent.count({ where: { campusId } });
+    await this.audit.log({ ...this.actor(user), action: `Imported approved students (+${inserted}/~${updated})`, target: `${total} total` });
+    return { received: lines.length, valid: valid.length, inserted, updated, duplicates, invalid: invalidRows.length, sampleInvalid: invalidRows.slice(0, 10), total };
+  }
+
   async approveRestaurant(user: AuthUser, id: string) {
     const r = await this.prisma.restaurant.update({
       where: { id },

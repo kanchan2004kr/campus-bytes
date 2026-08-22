@@ -4,13 +4,19 @@ import { UserRole } from '@campus-bytes/types';
 import { AuthService } from './auth.service';
 import {
   ChangePasswordDto,
+  CheckStudentIdDto,
   ForgotPasswordDto,
   OtpVerifyDto,
   PasswordLoginDto,
   RefreshDto,
+  RegisterCompleteDto,
+  RegisterSendOtpDto,
+  RegisterVerifyDto,
   ResetPasswordDto,
+  StudentForgotByIdDto,
   StudentLoginDto,
   StudentResendDto,
+  StudentResetByIdDto,
   StudentSignupDto,
 } from './dto/auth.dto';
 import { Public } from '../../common/auth/public.decorator';
@@ -21,6 +27,55 @@ import type { AuthUser } from '../../common/auth/auth.types';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
+
+  // ── Student: approved-roster gated registration ────────────────────
+  @Public()
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Post('student/check-id')
+  @HttpCode(200)
+  checkStudentId(@Body() dto: CheckStudentIdDto) {
+    return this.auth.checkStudentId(dto.studentId);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 4, ttl: 60_000 } })
+  @Post('student/register/send-otp')
+  @HttpCode(200)
+  registerSendOtp(@Body() dto: RegisterSendOtpDto) {
+    return this.auth.registerSendOtp(dto.studentId, dto.email);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('student/register/verify-otp')
+  @HttpCode(200)
+  registerVerifyOtp(@Body() dto: RegisterVerifyDto) {
+    return this.auth.registerVerifyOtp(dto.studentId, dto.email, dto.code);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 6, ttl: 60_000 } })
+  @Post('student/register/complete')
+  @HttpCode(200)
+  registerComplete(@Body() dto: RegisterCompleteDto) {
+    return this.auth.registerComplete(dto.studentId, dto.email, dto.password);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 4, ttl: 60_000 } })
+  @Post('student/forgot-password-by-id')
+  @HttpCode(200)
+  studentForgotById(@Body() dto: StudentForgotByIdDto) {
+    return this.auth.studentForgotByStudentId(dto.studentId);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('student/reset-password-by-id')
+  @HttpCode(200)
+  studentResetById(@Body() dto: StudentResetByIdDto) {
+    return this.auth.studentResetByStudentId(dto.studentId, dto.code, dto.password);
+  }
 
   // ── Student: password auth (signup verifies email via OTP) ─────────
   @Public()

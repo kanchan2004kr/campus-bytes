@@ -11,16 +11,201 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { TenantService } from '../tenant/tenant.service';
 import { OtpService } from './otp.service';
 import { TokenService } from './token.service';
+import { MailService } from '../mail/mail.service';
+import { loadEnv } from '../../config/env';
+import { TooManyRequestsException } from '../../common/too-many-requests.exception';
 import type { AuthUser } from '../../common/auth/auth.types';
 
 @Injectable()
 export class AuthService {
+  private readonly env = loadEnv();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantService,
     private readonly otp: OtpService,
     private readonly tokens: TokenService,
+    private readonly mail: MailService,
   ) {}
+
+  // ── Student: approved-roster gated registration ─────────────────────
+  private normId(s: string) {
+    return s.trim().toUpperCase().replace(/\s+/g, '');
+  }
+  private maskEmail(email: string) {
+    const [u, d] = email.split('@');
+    if (!d) return email;
+    const head = u.slice(0, Math.min(2, u.length));
+    return `${head}${'*'.repeat(Math.max(1, u.length - head.length))}@${d}`;
+  }
+
+  /** Step 1: verify a Student ID against the approved roster + registration state. */
+  async checkStudentId(studentIdRaw: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const studentId = this.normId(studentIdRaw);
+    const approved = await this.prisma.approvedStudent.findUnique({
+      where: { campusId_studentId: { campusId, studentId } },
+    });
+    if (!approved) return { status: 'not_found' as const };
+    const existing = await this.prisma.user.findFirst({
+      where: { campusId, studentId, role: UserRole.STUDENT, verified: true },
+    });
+    if (existing) return { status: 'already_registered' as const };
+    return { status: 'ok' as const, name: approved.name };
+  }
+
+  /** Step 2: email + Send OTP. Creates/updates a server-side pending registration. */
+  async registerSendOtp(studentIdRaw: string, emailRaw: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const studentId = this.normId(studentIdRaw);
+    const email = emailRaw.toLowerCase().trim();
+
+    const approved = await this.prisma.approvedStudent.findUnique({
+      where: { campusId_studentId: { campusId, studentId } },
+    });
+    if (!approved) {
+      throw new BadRequestException(
+        'Student ID not found. Registration is available only for authorized NIMS students.',
+      );
+    }
+    const already = await this.prisma.user.findFirst({
+      where: { campusId, studentId, role: UserRole.STUDENT, verified: true },
+    });
+    if (already) {
+      throw new ConflictException('This Student ID is already registered. Please sign in instead.');
+    }
+    const emailClash = await this.prisma.user.findFirst({
+      where: { campusId, email, role: UserRole.STUDENT, verified: true, studentId: { not: studentId } },
+    });
+    if (emailClash) {
+      throw new ConflictException('This email is already used by another account.');
+    }
+
+    // Throttle re-sends per pending attempt.
+    const existing = await this.prisma.pendingRegistration.findUnique({
+      where: { campusId_studentId: { campusId, studentId } },
+    });
+    if (existing) {
+      const ageSec = (Date.now() - existing.updatedAt.getTime()) / 1000;
+      if (ageSec < this.env.otp.resendThrottleSec) {
+        throw new TooManyRequestsException('Please wait before requesting another OTP.');
+      }
+    }
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const codeHash = await bcrypt.hash(code, 10);
+    const expiresAt = new Date(Date.now() + this.env.otp.ttlMinutes * 60 * 1000);
+
+    // Send first — if it fails, persist nothing (no rate-limit on a non-delivered code).
+    await this.mail.sendOtp(email, code, approved.name);
+
+    await this.prisma.pendingRegistration.upsert({
+      where: { campusId_studentId: { campusId, studentId } },
+      create: { campusId, studentId, name: approved.name, email, codeHash, expiresAt, attempts: 0 },
+      update: { email, name: approved.name, codeHash, expiresAt, attempts: 0, verifiedAt: null },
+    });
+    return { sent: true, email };
+  }
+
+  /** Step 3: verify the emailed OTP for a pending registration. */
+  async registerVerifyOtp(studentIdRaw: string, emailRaw: string, code: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const studentId = this.normId(studentIdRaw);
+    const email = emailRaw.toLowerCase().trim();
+    const pending = await this.prisma.pendingRegistration.findUnique({
+      where: { campusId_studentId: { campusId, studentId } },
+    });
+    if (!pending || pending.email !== email) {
+      throw new BadRequestException('No active code. Please request a new OTP.');
+    }
+    if (pending.expiresAt < new Date()) throw new BadRequestException('Code expired. Request a new one.');
+    if (pending.attempts >= this.env.otp.maxAttempts) {
+      throw new TooManyRequestsException('Too many attempts. Request a new code.');
+    }
+    const ok = await bcrypt.compare(code, pending.codeHash);
+    if (!ok) {
+      await this.prisma.pendingRegistration.update({
+        where: { id: pending.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new BadRequestException('Incorrect code');
+    }
+    await this.prisma.pendingRegistration.update({
+      where: { id: pending.id },
+      data: { verifiedAt: new Date() },
+    });
+    return { verified: true };
+  }
+
+  /** Step 4: set password → create the real account (only now). */
+  async registerComplete(studentIdRaw: string, emailRaw: string, password: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const studentId = this.normId(studentIdRaw);
+    const email = emailRaw.toLowerCase().trim();
+    const pending = await this.prisma.pendingRegistration.findUnique({
+      where: { campusId_studentId: { campusId, studentId } },
+    });
+    if (!pending || pending.email !== email || !pending.verifiedAt) {
+      throw new BadRequestException('Please verify your email with the OTP first.');
+    }
+    // Re-check eligibility at commit time (never trust an earlier step).
+    const approved = await this.prisma.approvedStudent.findUnique({
+      where: { campusId_studentId: { campusId, studentId } },
+    });
+    if (!approved) throw new BadRequestException('Student ID is not authorized.');
+    const already = await this.prisma.user.findFirst({
+      where: { campusId, studentId, role: UserRole.STUDENT, verified: true },
+    });
+    if (already) throw new ConflictException('This Student ID is already registered. Please sign in instead.');
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await this.prisma.user.create({
+      data: {
+        campusId,
+        email,
+        role: UserRole.STUDENT,
+        name: approved.name,
+        studentId,
+        passwordHash,
+        verified: true,
+      },
+    });
+    await this.prisma.pendingRegistration.delete({ where: { id: pending.id } }).catch(() => undefined);
+    return this.issueSession({ sub: user.id, role: UserRole.STUDENT, campusId });
+  }
+
+  /** Forgot password: student enters Student ID → OTP to their registered email. */
+  async studentForgotByStudentId(studentIdRaw: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const studentId = this.normId(studentIdRaw);
+    const user = await this.prisma.user.findFirst({
+      where: { campusId, studentId, role: UserRole.STUDENT, verified: true },
+    });
+    if (!user || user.status === 'blocked') {
+      // Generic — never disclose whether the Student ID is registered.
+      return { sent: true };
+    }
+    try {
+      await this.otp.issue(user.id, user.email, user.name);
+    } catch {
+      // Swallow throttle/send errors — never leak existence.
+    }
+    return { sent: true, email: this.maskEmail(user.email) };
+  }
+
+  async studentResetByStudentId(studentIdRaw: string, code: string, newPassword: string) {
+    const campusId = await this.tenant.getDefaultCampusId();
+    const studentId = this.normId(studentIdRaw);
+    const user = await this.prisma.user.findFirst({
+      where: { campusId, studentId, role: UserRole.STUDENT, verified: true },
+    });
+    if (!user) throw new BadRequestException('Invalid or expired OTP.');
+    await this.otp.verify(user.id, code); // throws on invalid/expired/lockout
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+    await this.tokens.revokeAll(user.id);
+    return { ok: true };
+  }
 
   // ── Student: signup (Student ID + Course + Email) ───────────────────
   async studentSignup(input: {

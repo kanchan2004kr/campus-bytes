@@ -21,6 +21,48 @@ function persist(res: SessionResponse) {
   return res;
 }
 
+// ── Student: approved-roster gated registration ──────────────────────
+export type CheckIdResult =
+  | { status: 'ok'; name: string }
+  | { status: 'not_found' }
+  | { status: 'already_registered' };
+
+export async function checkStudentId(studentId: string): Promise<CheckIdResult> {
+  return api.post('/auth/student/check-id', { studentId: studentId.trim() });
+}
+
+export async function registerSendOtp(studentId: string, email: string): Promise<OtpSentResponse> {
+  return api.post('/auth/student/register/send-otp', {
+    studentId: studentId.trim(),
+    email: email.trim().toLowerCase(),
+  });
+}
+
+export async function registerVerifyOtp(studentId: string, email: string, code: string): Promise<{ verified: true }> {
+  return api.post('/auth/student/register/verify-otp', {
+    studentId: studentId.trim(),
+    email: email.trim().toLowerCase(),
+    code,
+  });
+}
+
+export async function registerComplete(studentId: string, email: string, password: string): Promise<SessionResponse> {
+  const res = await api.post<SessionResponse>('/auth/student/register/complete', {
+    studentId: studentId.trim(),
+    email: email.trim().toLowerCase(),
+    password,
+  });
+  return persist(res);
+}
+
+export async function studentForgotById(studentId: string): Promise<{ sent: true; email?: string }> {
+  return api.post('/auth/student/forgot-password-by-id', { studentId: studentId.trim() });
+}
+
+export async function studentResetById(studentId: string, code: string, password: string): Promise<{ ok: true }> {
+  return api.post('/auth/student/reset-password-by-id', { studentId: studentId.trim(), code, password });
+}
+
 // ── Student: password auth (signup verifies email via OTP) ───────────
 export async function studentSignup(input: {
   name: string;

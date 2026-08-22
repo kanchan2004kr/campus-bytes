@@ -183,6 +183,42 @@ model RefreshToken {
   @@map("refresh_token")
 }
 
+// Authorized-student roster (source of truth for who may register). Populated by
+// admin CSV import — NOT user accounts. A student becomes a real User only after
+// completing the OTP + password flow. studentId is unique per campus.
+model ApprovedStudent {
+  id        String   @id @default(uuid())
+  campusId  String
+  studentId String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([campusId, studentId])
+  @@index([campusId])
+  @@map("approved_student")
+}
+
+// Server-side registration attempt held BEFORE an account exists. Stores the
+// hashed email OTP; the User row is created only after OTP verify + password set.
+model PendingRegistration {
+  id         String    @id @default(uuid())
+  campusId   String
+  studentId  String
+  name       String
+  email      String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([campusId, studentId])
+  @@index([campusId, email])
+  @@map("pending_registration")
+}
+
 // ─────────────────────────── Restaurant ───────────────────────────
 model Restaurant {
   id                String           @id @default(uuid())

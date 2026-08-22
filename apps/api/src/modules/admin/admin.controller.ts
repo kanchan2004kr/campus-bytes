@@ -97,6 +97,11 @@ class OwnerStatusDto {
   @IsBoolean()
   active!: boolean;
 }
+class ImportApprovedStudentsDto {
+  // Raw CSV text: "studentId,studentName" per line (header row optional).
+  @IsString() @MinLength(1) @MaxLength(2_000_000)
+  csv!: string;
+}
 
 /** All endpoints require ADMIN. RBAC enforced by RolesGuard, self-scoped to campus. */
 @Roles(UserRole.ADMIN)
@@ -122,6 +127,17 @@ export class AdminController {
   @Get('restaurants/:id')
   restaurantDetail(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.admin.restaurantDetail(u.campusId, id);
+  }
+
+  @Get('approved-students/count')
+  approvedStudentsCount(@CurrentUser() u: AuthUser) {
+    return this.admin.approvedStudentsCount(u.campusId);
+  }
+
+  @Post('approved-students/import')
+  @HttpCode(200)
+  importApprovedStudents(@CurrentUser() u: AuthUser, @Body() dto: ImportApprovedStudentsDto) {
+    return this.admin.importApprovedStudents(u, dto.csv);
   }
 
   @Post('restaurants')
