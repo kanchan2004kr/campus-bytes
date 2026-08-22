@@ -15,6 +15,9 @@ export default function StudentHomePage() {
   const topPicksQuery = useQuery({ queryKey: ['top-picks'], queryFn: getTopPicks });
 
   const restaurants = restaurantsQuery.data ?? [];
+  // Don't repeat the "Top picks" outlets in the "All campus outlets" grid.
+  const topIds = new Set((topPicksQuery.data ?? []).slice(0, 4).map((r) => r.id));
+  const otherOutlets = restaurants.filter((r) => !topIds.has(r.id));
   const openCount = restaurants.filter((r) => r.isOpen && !r.isPaused).length;
   const avgWait = openCount
     ? Math.round(
@@ -59,7 +62,7 @@ export default function StudentHomePage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {restaurantsQuery.isLoading
               ? Array.from({ length: 4 }).map((_, i) => <RestaurantCardSkeleton key={i} />)
-              : restaurants.map((r) => <RestaurantCard key={r.id} restaurant={r} />)}
+              : otherOutlets.map((r) => <RestaurantCard key={r.id} restaurant={r} />)}
           </div>
         )}
       </section>
