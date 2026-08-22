@@ -1,4 +1,4 @@
-import { Body, Controller, Patch } from '@nestjs/common';
+import { Body, Controller, Get, Patch } from '@nestjs/common';
 import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 import { UserRole } from '@campus-bytes/types';
 import { RestaurantsService } from './restaurants.service';
@@ -30,6 +30,11 @@ export class RestaurantOwnerController {
     private readonly service: RestaurantsService,
     private readonly prisma: PrismaService,
   ) {}
+
+  @Get('profile')
+  async getProfile(@CurrentUser() user: AuthUser) {
+    return this.service.getOwnProfile(await resolveRestaurantId(this.prisma, user));
+  }
 
   @Patch('status')
   async setStatus(@CurrentUser() user: AuthUser, @Body() dto: PauseDto) {

@@ -367,6 +367,43 @@ export async function setPaused(next: boolean) {
   return delay({ paused: store.paused, isOpen: !store.paused && !store.manuallyClosed });
 }
 
+// ── Restaurant profile (name, description, images, contact, hours) ────────
+export interface MyRestaurant {
+  id: string;
+  name: string;
+  description: string | null;
+  cuisine: string | null;
+  phone: string | null;
+  hours: string | null;
+  logoUrl: string | null;
+  coverUrl: string | null;
+  isPaused: boolean;
+  isOpen: boolean;
+}
+
+export async function getMyRestaurant(): Promise<MyRestaurant | null> {
+  if (API_ENABLED) return api.get<MyRestaurant | null>('/restaurant/profile');
+  return delay({
+    id: 'demo',
+    name: CURRENT_RESTAURANT.name,
+    description: 'All-day chai, snacks & combos served hot near the north block.',
+    cuisine: CURRENT_RESTAURANT.cuisine,
+    phone: null,
+    hours: '8:00 AM – 11:00 PM',
+    logoUrl: null,
+    coverUrl: null,
+    isPaused: false,
+    isOpen: true,
+  });
+}
+
+export async function updateRestaurantProfile(
+  dto: Partial<Pick<MyRestaurant, 'name' | 'description' | 'cuisine' | 'phone' | 'hours' | 'logoUrl' | 'coverUrl'>>,
+) {
+  if (API_ENABLED) return api.patch('/restaurant/profile', dto);
+  return delay({ ...dto });
+}
+
 // ── Demo affordance (replaced by WebSocket push in Phase 11) ─────────────
 const DEMO_STUDENTS = [
   { studentName: 'Diya Sharma', hostelName: 'Vista Hostel', roomNo: '318' },

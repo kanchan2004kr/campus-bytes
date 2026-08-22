@@ -56,6 +56,24 @@ export class RestaurantsService {
     return { isOpen: r.status === RestaurantStatus.APPROVED && !r.isPaused, paused: r.isPaused };
   }
 
+  /** Owner reads their OWN restaurant profile (restaurantId comes from the JWT). */
+  async getOwnProfile(restaurantId: string) {
+    const r = await this.prisma.restaurant.findUnique({ where: { id: restaurantId } });
+    if (!r) return null;
+    return {
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      cuisine: r.cuisine,
+      phone: r.phone,
+      hours: r.hours,
+      logoUrl: r.logoUrl,
+      coverUrl: r.coverUrl,
+      isPaused: r.isPaused,
+      isOpen: r.status === RestaurantStatus.APPROVED && !r.isPaused,
+    };
+  }
+
   /** Owner edits their OWN restaurant profile (restaurantId comes from the JWT). */
   async updateOwnProfile(
     restaurantId: string,
