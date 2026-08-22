@@ -102,8 +102,54 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return json as T;
 }
 
+/**
+ * Multipart upload (real file → our backend). Mirrors `request`'s bearer-token +
+ * one-shot 401 refresh, but sends FormData (no JSON Content-Type, so the browser
+ * sets the multipart boundary itself).
+ */
+async function uploadFile<T>(path: string, form: FormData): Promise<T> {
+  const send = (token: string | null) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    return fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+      credentials: 'include',
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timer));
+  };
+
+  let res: Response;
+  try {
+    res = await send(getAccessToken());
+    if (res.status === 401) {
+      const fresh = await tryRefresh();
+      if (fresh) res = await send(fresh);
+      else useAuthStore.getState().clear();
+    }
+  } catch (e) {
+    const aborted = e instanceof DOMException && e.name === 'AbortError';
+    throw new ApiError(
+      aborted ? 'TIMEOUT' : 'NETWORK',
+      aborted
+        ? 'The server took too long to respond. Please try again.'
+        : 'Unable to connect to the server. Please try again.',
+      0,
+    );
+  }
+
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const err = (json as { error?: { code?: string; message?: string } } | null)?.error;
+    throw new ApiError(err?.code ?? 'ERROR', err?.message ?? res.statusText, res.status);
+  }
+  return json as T;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>('GET', path),
+  upload: uploadFile,
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
