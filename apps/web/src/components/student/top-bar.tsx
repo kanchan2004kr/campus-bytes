@@ -22,14 +22,15 @@ export function StudentTopBar() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur">
-      <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-6">
-        <div className="flex min-w-0 items-center gap-4">
-          <Link href="/" aria-label="CampusBytes home">
-            <Logo size={30} />
+      <div className="flex w-full items-center gap-2 overflow-hidden px-3 py-2.5 sm:gap-3 sm:px-4 md:px-6">
+        {/* Left: logo + address. Takes remaining space and shrinks/truncates. */}
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+          <Link href="/" aria-label="CampusBytes home" className="shrink-0">
+            <Logo size={28} />
           </Link>
 
           {/* Display-only delivery address (no form/modal on Home). */}
-          <div className="flex min-w-0 items-center gap-2 px-1 py-1">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
             <MapPin className="h-4 w-4 shrink-0 text-brand-600" />
             <span className="flex min-w-0 flex-col leading-tight">
               <span className="text-2xs font-medium uppercase tracking-wide text-ink-400">
@@ -38,13 +39,13 @@ export function StudentTopBar() {
               {label ? (
                 <span className="truncate text-sm font-semibold text-ink-900">{label}</span>
               ) : (
-                <span className="flex items-center gap-1.5 text-sm font-semibold text-ink-900">
-                  Not added
+                <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-ink-900">
+                  <span className="truncate">Not added</span>
                   <Link
                     href="/delivery-address?next=/"
-                    className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                    className="shrink-0 text-xs font-medium text-brand-600 hover:text-brand-700"
                   >
-                    Add address
+                    Add
                   </Link>
                 </span>
               )}
@@ -52,7 +53,8 @@ export function StudentTopBar() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        {/* Right: fixed action icons — never shrink, always tappable. */}
+        <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
           <Link
             href="/notifications"
             aria-label="Notifications"

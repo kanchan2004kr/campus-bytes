@@ -22,7 +22,8 @@ export function CreateRestaurantModal({ open, onClose }: { open: boolean; onClos
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const valid = name.trim().length >= 2 && ownerEmail.includes('@') && password.length >= 8;
+  // Required: restaurant name, owner email, password (min 8). Everything else is optional.
+  const valid = name.trim().length >= 2 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail) && password.length >= 8;
 
   const reset = () => {
     setName(''); setOwnerEmail(''); setOwnerName(''); setPassword('');
