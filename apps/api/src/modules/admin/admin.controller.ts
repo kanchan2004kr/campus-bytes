@@ -15,8 +15,10 @@ import {
   IsEnum,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -74,6 +76,10 @@ class UpdateRestaurantDto {
   @IsOptional() @IsInt() @Min(1) prepTimeMin?: number;
   @IsOptional() @IsBoolean() deliveryAvailable?: boolean;
   @IsOptional() @IsBoolean() isPaused?: boolean;
+  @IsOptional() @IsNumber() @Min(0) @Max(5) avgRating?: number;
+  // Owner account fields — updated on the linked owner user (if any).
+  @IsOptional() @IsString() @MaxLength(80) ownerName?: string;
+  @IsOptional() @IsEmail() ownerEmail?: string;
 }
 class ResetRestaurantPwDto {
   @IsString() @MinLength(8) @MaxLength(72)
@@ -111,6 +117,11 @@ export class AdminController {
   @Get('restaurants')
   restaurants(@CurrentUser() u: AuthUser, @Query('status') status?: RestaurantStatus) {
     return this.admin.listRestaurants(u.campusId, status);
+  }
+
+  @Get('restaurants/:id')
+  restaurantDetail(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.admin.restaurantDetail(u.campusId, id);
   }
 
   @Post('restaurants')

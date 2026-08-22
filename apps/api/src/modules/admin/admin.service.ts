@@ -125,6 +125,36 @@ export class AdminService {
     );
   }
 
+  /** Full profile + owner details for the admin Edit modal. Campus-scoped. */
+  async restaurantDetail(campusId: string, id: string) {
+    const r = await this.prisma.restaurant.findFirst({
+      where: { id, campusId, deletedAt: null },
+      include: { owner: { select: { id: true, name: true, email: true, status: true } } },
+    });
+    if (!r) throw new NotFoundException('Restaurant not found');
+    return {
+      id: r.id,
+      name: r.name,
+      description: r.description ?? '',
+      cuisine: r.cuisine ?? '',
+      phone: r.phone ?? '',
+      hours: r.hours ?? '',
+      logoUrl: r.logoUrl ?? null,
+      coverUrl: r.coverUrl ?? null,
+      prepTimeMin: r.prepTimeMin,
+      deliveryAvailable: r.deliveryAvailable,
+      isPaused: r.isPaused,
+      crowdLevel: r.crowdLevel,
+      avgRating: r.avgRating,
+      ratingCount: r.ratingCount,
+      status: r.status,
+      hasOwner: Boolean(r.owner),
+      ownerName: r.owner?.name ?? '',
+      ownerEmail: r.owner?.email ?? '',
+      ownerActive: r.owner ? r.owner.status === UserStatus.ACTIVE : false,
+    };
+  }
+
   async approveRestaurant(user: AuthUser, id: string) {
     const r = await this.prisma.restaurant.update({
       where: { id },
@@ -246,10 +276,33 @@ export class AdminService {
       prepTimeMin: number;
       deliveryAvailable: boolean;
       isPaused: boolean;
+      avgRating: number;
+      ownerName: string;
+      ownerEmail: string;
     }>,
   ) {
-    const r = await this.prisma.restaurant.findUnique({ where: { id } });
+    const r = await this.prisma.restaurant.findFirst({
+      where: { id, campusId: user.campusId },
+    });
     if (!r || r.deletedAt) throw new NotFoundException('Restaurant not found');
+
+    // Owner account changes (name/email) — only touch THIS restaurant's owner.
+    if ((dto.ownerName !== undefined || dto.ownerEmail !== undefined) && r.ownerUserId) {
+      const ownerData: { name?: string; email?: string } = {};
+      if (dto.ownerName !== undefined && dto.ownerName.trim()) ownerData.name = dto.ownerName.trim();
+      if (dto.ownerEmail !== undefined) {
+        const email = dto.ownerEmail.toLowerCase().trim();
+        const clash = await this.prisma.user.findFirst({
+          where: { campusId: user.campusId, email, id: { not: r.ownerUserId } },
+        });
+        if (clash) throw new BadRequestException('Another account already uses this email.');
+        ownerData.email = email;
+      }
+      if (Object.keys(ownerData).length) {
+        await this.prisma.user.update({ where: { id: r.ownerUserId }, data: ownerData });
+      }
+    }
+
     const updated = await this.prisma.restaurant.update({
       where: { id },
       data: {
@@ -263,6 +316,7 @@ export class AdminService {
         ...(dto.prepTimeMin !== undefined ? { prepTimeMin: dto.prepTimeMin } : {}),
         ...(dto.deliveryAvailable !== undefined ? { deliveryAvailable: dto.deliveryAvailable } : {}),
         ...(dto.isPaused !== undefined ? { isPaused: dto.isPaused } : {}),
+        ...(dto.avgRating !== undefined ? { avgRating: dto.avgRating } : {}),
       },
     });
     await this.audit.log({ ...this.actor(user), action: 'Edited restaurant', target: updated.name });

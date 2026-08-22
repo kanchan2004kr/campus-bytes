@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import {
   BadRequestException,
   Controller,
-  Get,
   HttpCode,
   Logger,
   MaxFileSizeValidator,
@@ -16,7 +15,6 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UserRole } from '@campus-bytes/types';
 import { Roles } from '../../common/auth/roles.decorator';
-import { Public } from '../../common/auth/public.decorator';
 
 // Minimal shape of a Multer file (avoids a @types/multer dependency).
 interface UploadedImage {
@@ -29,11 +27,6 @@ interface UploadedImage {
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const FOLDER_RE = /^[a-zA-Z0-9/_-]+$/;
-// 1x1 transparent PNG — used only by the self-test to exercise the real signing path.
-const PIXEL_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-  'base64',
-);
 
 /**
  * Server-side image uploads. The browser sends the actual file (multipart/form-data)
@@ -125,46 +118,6 @@ export class UploadsController {
 
     this.logger.log(`Uploaded ${filename} (${buffer.length}B) → ${data.secure_url}`);
     return data.secure_url;
-  }
-
-  /**
-   * Public diagnostic: reports WHICH Cloudinary env vars are present on the server
-   * (booleans only — never the values). Lets us confirm Render configuration without
-   * leaking secrets. Safe to keep in production.
-   */
-  @Public()
-  @Get('config-status')
-  configStatus() {
-    const { cloudName, apiKey, apiSecret } = this.cloudinaryEnv();
-    const rawSecret = process.env.CLOUDINARY_API_SECRET;
-    return {
-      configured: Boolean(cloudName && apiKey && apiSecret),
-      vars: {
-        CLOUDINARY_CLOUD_NAME: Boolean(cloudName),
-        CLOUDINARY_API_KEY: Boolean(apiKey),
-        CLOUDINARY_API_SECRET: Boolean(apiSecret),
-      },
-      // Booleans only — never the secret value.
-      secretHadSurroundingWhitespace: Boolean(rawSecret && rawSecret !== rawSecret.trim()),
-    };
-  }
-
-  /**
-   * Public self-test: signs + uploads a 1x1 PNG using the SERVER's real Cloudinary
-   * secret, exercising the exact signing path. Lets us verify the deployed secret
-   * end-to-end without a login token. Returns Cloudinary's exact error on failure
-   * (e.g. "Invalid Signature" ⇒ the CLOUDINARY_API_SECRET value is wrong).
-   */
-  @Public()
-  @Post('self-test')
-  @HttpCode(200)
-  async selfTest(): Promise<{ ok: boolean; url?: string; error?: string }> {
-    try {
-      const url = await this.uploadBuffer(PIXEL_PNG, 'image/png', 'selftest.png', 'campusbytes/_selftest');
-      return { ok: true, url };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : 'Upload failed.' };
-    }
   }
 
   @Roles(UserRole.RESTAURANT, UserRole.ADMIN)

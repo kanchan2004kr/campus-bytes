@@ -8,6 +8,7 @@ import { Badge, Button, Skeleton, Table, THead, TBody, TR, TH, TD, ConfirmDialog
 import { getRestaurants, setRestaurantStatus, type AdminRestaurant } from '@/data/admin';
 import { PageHeader } from '@/components/admin/page-header';
 import { CreateRestaurantModal } from '@/components/admin/create-restaurant-modal';
+import { EditRestaurantModal } from '@/components/admin/edit-restaurant-modal';
 import { formatCurrency } from '@/lib/format';
 
 const STATUS_TONE = {
@@ -21,6 +22,7 @@ export default function AdminRestaurantsPage() {
   const { data, isLoading } = useQuery({ queryKey: ['admin-restaurants', 'all'], queryFn: () => getRestaurants() });
   const [confirm, setConfirm] = useState<{ r: AdminRestaurant; to: RestaurantStatus } | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const mut = useMutation({
     mutationFn: ({ id, status }: { id: string; status: RestaurantStatus }) => setRestaurantStatus(id, status),
@@ -43,6 +45,7 @@ export default function AdminRestaurantsPage() {
         }
       />
       <CreateRestaurantModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <EditRestaurantModal restaurantId={editId} open={!!editId} onClose={() => setEditId(null)} />
 
       <div className="rounded-lg border border-line bg-surface shadow-sm">
         {isLoading ? (
@@ -74,17 +77,22 @@ export default function AdminRestaurantsPage() {
                   <TD className="tabular-nums">{formatCurrency(r.revenueToday)}</TD>
                   <TD>★ {r.avgRating.toFixed(1)}</TD>
                   <TD className="text-right">
-                    {r.status === RestaurantStatus.APPROVED ? (
-                      <Button variant="ghost" size="sm" className="text-error" onClick={() => setConfirm({ r, to: RestaurantStatus.SUSPENDED })}>
-                        Suspend
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => setEditId(r.id)}>
+                        Edit
                       </Button>
-                    ) : r.status === RestaurantStatus.SUSPENDED ? (
-                      <Button variant="ghost" size="sm" onClick={() => setConfirm({ r, to: RestaurantStatus.APPROVED })}>
-                        Reactivate
-                      </Button>
-                    ) : (
-                      <span className="text-2xs text-ink-400">Awaiting review</span>
-                    )}
+                      {r.status === RestaurantStatus.APPROVED ? (
+                        <Button variant="ghost" size="sm" className="text-error" onClick={() => setConfirm({ r, to: RestaurantStatus.SUSPENDED })}>
+                          Suspend
+                        </Button>
+                      ) : r.status === RestaurantStatus.SUSPENDED ? (
+                        <Button variant="ghost" size="sm" onClick={() => setConfirm({ r, to: RestaurantStatus.APPROVED })}>
+                          Reactivate
+                        </Button>
+                      ) : (
+                        <span className="text-2xs text-ink-400">Awaiting review</span>
+                      )}
+                    </div>
                   </TD>
                 </TR>
               ))}

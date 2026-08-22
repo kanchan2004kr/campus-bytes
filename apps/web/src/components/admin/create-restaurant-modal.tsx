@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Field, Input, Modal, toast } from '@campus-bytes/ui';
+import { Button, Field, Input, Modal, Textarea, toast } from '@campus-bytes/ui';
 import { ApiError } from '@/lib/api-client';
 import { createRestaurant } from '@/data/admin';
 
@@ -19,18 +19,19 @@ export function CreateRestaurantModal({ open, onClose }: { open: boolean; onClos
   const [cuisine, setCuisine] = useState('');
   const [phone, setPhone] = useState('');
   const [hours, setHours] = useState('');
+  const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const valid = name.trim().length >= 2 && ownerEmail.includes('@') && password.length >= 8;
 
   const reset = () => {
     setName(''); setOwnerEmail(''); setOwnerName(''); setPassword('');
-    setCuisine(''); setPhone(''); setHours(''); setError(null);
+    setCuisine(''); setPhone(''); setHours(''); setDescription(''); setError(null);
   };
 
   const mutation = useMutation({
     mutationFn: () =>
-      createRestaurant({ name, ownerEmail, ownerName: ownerName || undefined, password, cuisine, phone, hours }),
+      createRestaurant({ name, ownerEmail, ownerName: ownerName || undefined, password, cuisine, phone, hours, description }),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['admin-restaurants'] });
       qc.invalidateQueries({ queryKey: ['admin-overview'] });
@@ -61,6 +62,9 @@ export function CreateRestaurantModal({ open, onClose }: { open: boolean; onClos
             <Input id="cr-hours" value={hours} onChange={(e) => setHours(e.target.value)} placeholder="8 AM – 11 PM" />
           </Field>
         </div>
+        <Field label="Description" htmlFor="cr-desc">
+          <Textarea id="cr-desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short description shown to students" />
+        </Field>
         <Field label="Owner name" htmlFor="cr-owner">
           <Input id="cr-owner" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="Owner full name" />
         </Field>

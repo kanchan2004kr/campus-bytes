@@ -282,6 +282,75 @@ export async function createRestaurant(input: {
   return delay({ id: crypto.randomUUID(), name: input.name, ownerEmail: input.ownerEmail });
 }
 
+export interface AdminRestaurantDetail {
+  id: string;
+  name: string;
+  description: string;
+  cuisine: string;
+  phone: string;
+  hours: string;
+  logoUrl: string | null;
+  coverUrl: string | null;
+  prepTimeMin: number;
+  deliveryAvailable: boolean;
+  isPaused: boolean;
+  avgRating: number;
+  ratingCount: number;
+  status: RestaurantStatus;
+  hasOwner: boolean;
+  ownerName: string;
+  ownerEmail: string;
+  ownerActive: boolean;
+}
+
+export type UpdateRestaurantInput = Partial<{
+  name: string;
+  description: string;
+  cuisine: string;
+  phone: string;
+  hours: string;
+  logoUrl: string;
+  coverUrl: string;
+  prepTimeMin: number;
+  deliveryAvailable: boolean;
+  isPaused: boolean;
+  avgRating: number;
+  ownerName: string;
+  ownerEmail: string;
+}>;
+
+// Admin: full profile + owner for the Edit modal.
+export async function getRestaurantDetail(id: string) {
+  if (API_ENABLED) return api.get<AdminRestaurantDetail>(`/admin/restaurants/${id}`);
+  const r = store.restaurants.find((x) => x.id === id)!;
+  return delay<AdminRestaurantDetail>({
+    id: r.id, name: r.name, description: '', cuisine: r.cuisine, phone: '', hours: '',
+    logoUrl: null, coverUrl: null, prepTimeMin: 15, deliveryAvailable: true, isPaused: r.isPaused,
+    avgRating: r.avgRating, ratingCount: r.ratingCount, status: r.status,
+    hasOwner: true, ownerName: r.ownerName, ownerEmail: r.ownerEmail, ownerActive: true,
+  });
+}
+
+// Admin: update a restaurant's profile + linked owner (PATCH /admin/restaurants/:id).
+export async function updateRestaurant(id: string, patch: UpdateRestaurantInput) {
+  if (API_ENABLED) return api.patch<{ id: string; name: string; status: RestaurantStatus }>(`/admin/restaurants/${id}`, patch);
+  const r = store.restaurants.find((x) => x.id === id);
+  if (r) {
+    if (patch.name !== undefined) r.name = patch.name;
+    if (patch.cuisine !== undefined) r.cuisine = patch.cuisine;
+    if (patch.ownerName !== undefined) r.ownerName = patch.ownerName;
+    if (patch.ownerEmail !== undefined) r.ownerEmail = patch.ownerEmail;
+    logAudit(store, 'Edited restaurant', r.name);
+  }
+  return delay({ id, name: r?.name ?? '', status: r?.status ?? RestaurantStatus.APPROVED });
+}
+
+// Admin: attach an owner login to a restaurant that has none.
+export async function createRestaurantOwner(id: string, input: { ownerEmail: string; ownerName?: string; password: string }) {
+  if (API_ENABLED) return api.post<{ id: string; name: string; ownerEmail: string }>(`/admin/restaurants/${id}/create-owner`, input);
+  return delay({ id, name: '', ownerEmail: input.ownerEmail });
+}
+
 export async function resetRestaurantPassword(id: string, password: string) {
   if (API_ENABLED) return api.post(`/admin/restaurants/${id}/reset-password`, { password });
   return delay({ ok: true });
