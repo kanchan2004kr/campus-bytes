@@ -41,10 +41,13 @@ export class UploadsController {
   private readonly logger = new Logger(UploadsController.name);
 
   private cloudinaryEnv() {
+    // Trim: a trailing newline/space pasted into the env value (common with
+    // dashboards) does NOT change the string-to-sign but silently breaks the
+    // HMAC — Cloudinary then returns "Invalid Signature".
     return {
-      cloudName: process.env.CLOUDINARY_CLOUD_NAME,
-      apiKey: process.env.CLOUDINARY_API_KEY,
-      apiSecret: process.env.CLOUDINARY_API_SECRET,
+      cloudName: process.env.CLOUDINARY_CLOUD_NAME?.trim(),
+      apiKey: process.env.CLOUDINARY_API_KEY?.trim(),
+      apiSecret: process.env.CLOUDINARY_API_SECRET?.trim(),
     };
   }
 
@@ -57,6 +60,7 @@ export class UploadsController {
   @Get('config-status')
   configStatus() {
     const { cloudName, apiKey, apiSecret } = this.cloudinaryEnv();
+    const rawSecret = process.env.CLOUDINARY_API_SECRET;
     return {
       configured: Boolean(cloudName && apiKey && apiSecret),
       vars: {
@@ -64,6 +68,8 @@ export class UploadsController {
         CLOUDINARY_API_KEY: Boolean(apiKey),
         CLOUDINARY_API_SECRET: Boolean(apiSecret),
       },
+      // Booleans only — never the secret value. Confirms the whitespace root cause.
+      secretHadSurroundingWhitespace: Boolean(rawSecret && rawSecret !== rawSecret.trim()),
     };
   }
 
@@ -105,7 +111,10 @@ export class UploadsController {
     }
 
     const timestamp = Math.floor(Date.now() / 1000);
+    // Log ONLY the signed params (never the secret or signature).
+    this.logger.log(`Signing Cloudinary upload — folder=${folder}, timestamp=${timestamp}`);
     // Cloudinary signature: sha1 of the sorted "k=v&k=v" signed params + api secret.
+    // (api_key and signature itself are NOT part of the string-to-sign.)
     const signature = createHash('sha1')
       .update(`folder=${folder}&timestamp=${timestamp}${apiSecret}`)
       .digest('hex');
