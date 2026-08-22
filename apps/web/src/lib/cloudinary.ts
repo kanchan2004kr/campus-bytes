@@ -1,30 +1,40 @@
-// Direct, unsigned image upload to Cloudinary from the browser. No API secret is
-// ever exposed — the (public) cloud name + unsigned upload preset gate uploads,
-// and the preset enforces allowed formats / size in the Cloudinary console.
-// Only the resulting secure_url is stored in our DB via the authenticated APIs.
+import { api } from './api-client';
 
-export const CLOUDINARY_CLOUD = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? '';
-export const CLOUDINARY_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET ?? '';
-export const CLOUDINARY_READY = Boolean(CLOUDINARY_CLOUD && CLOUDINARY_PRESET);
+// Image upload goes through OUR backend for signing (secret stays server-side),
+// then the browser POSTs the file straight to Cloudinary with the returned
+// signature. No Cloudinary keys live in the frontend bundle.
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
-const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const ALLOWED = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
-export async function uploadImage(file: File): Promise<string> {
-  if (!CLOUDINARY_READY) {
-    throw new Error('Image upload is not configured yet. Add your Cloudinary keys in Vercel.');
-  }
+interface SignResponse {
+  cloudName: string;
+  apiKey: string;
+  timestamp: number;
+  folder: string;
+  signature: string;
+}
+
+export async function uploadImage(file: File, folder = 'campusbytes'): Promise<string> {
   if (!ALLOWED.includes(file.type)) {
-    throw new Error('Please choose a JPG, PNG, WEBP or GIF image.');
+    throw new Error('Please choose a JPG, PNG or WEBP image.');
   }
   if (file.size > MAX_BYTES) {
     throw new Error('Image is too large (max 5 MB).');
   }
+
+  // 1) Ask our backend to sign the upload (auth-scoped to restaurant/admin).
+  const sig = await api.post<SignResponse>('/uploads/sign', { folder });
+
+  // 2) POST the file directly to Cloudinary with the signed params.
   const form = new FormData();
   form.append('file', file);
-  form.append('upload_preset', CLOUDINARY_PRESET);
+  form.append('api_key', sig.apiKey);
+  form.append('timestamp', String(sig.timestamp));
+  form.append('folder', sig.folder);
+  form.append('signature', sig.signature);
 
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, {
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`, {
     method: 'POST',
     body: form,
   });

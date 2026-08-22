@@ -15,6 +15,7 @@ import { RestaurantsModule } from './modules/restaurants/restaurants.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { StudentsModule } from './modules/students/students.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 import { JwtAuthGuard } from './common/auth/jwt-auth.guard';
 import { RolesGuard } from './common/auth/roles.guard';
 
@@ -34,6 +35,7 @@ import { RolesGuard } from './common/auth/roles.guard';
     OrdersModule,
     StudentsModule,
     AdminModule,
+    UploadsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: OtpThrottlerGuard },

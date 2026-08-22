@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import Image from 'next/image';
 import { ImagePlus, Loader2, X } from 'lucide-react';
 import { cn } from '@campus-bytes/ui';
-import { CLOUDINARY_READY, uploadImage } from '@/lib/cloudinary';
+import { uploadImage } from '@/lib/cloudinary';
 
 /**
  * Reusable image uploader. Uploads directly to Cloudinary (unsigned) and returns
@@ -72,7 +72,7 @@ export function ImageUpload({
           <button
             type="button"
             onClick={pick}
-            disabled={busy || !CLOUDINARY_READY}
+            disabled={busy}
             className="flex h-full w-full flex-col items-center justify-center gap-1 text-ink-500 hover:text-brand-600 disabled:opacity-60"
           >
             {busy ? <Loader2 className="h-6 w-6 animate-spin" /> : <ImagePlus className="h-6 w-6" />}
@@ -83,20 +83,21 @@ export function ImageUpload({
           <button
             type="button"
             onClick={pick}
-            disabled={busy || !CLOUDINARY_READY}
+            disabled={busy}
             className="absolute bottom-2 right-2 rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-brand-700 shadow hover:bg-white disabled:opacity-60"
           >
             {busy ? 'Uploading…' : 'Replace'}
           </button>
         )}
       </div>
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={onFile}
+      />
       {error && <p className="text-xs text-error">{error}</p>}
-      {!CLOUDINARY_READY && (
-        <p className="text-2xs text-ink-400">
-          Image upload isn’t configured yet — add Cloudinary keys in Vercel to enable it.
-        </p>
-      )}
     </div>
   );
 }
