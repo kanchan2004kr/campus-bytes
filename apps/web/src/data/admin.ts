@@ -267,6 +267,31 @@ export async function setRestaurantStatus(id: string, status: RestaurantStatus) 
   return delay(r);
 }
 
+// Admin: create a restaurant + its owner login (reuses POST /admin/restaurants).
+export async function createRestaurant(input: {
+  name: string;
+  ownerEmail: string;
+  ownerName?: string;
+  password: string;
+  cuisine?: string;
+  phone?: string;
+  hours?: string;
+  description?: string;
+}) {
+  if (API_ENABLED) return api.post<{ id: string; name: string; ownerEmail: string }>('/admin/restaurants', input);
+  return delay({ id: crypto.randomUUID(), name: input.name, ownerEmail: input.ownerEmail });
+}
+
+export async function resetRestaurantPassword(id: string, password: string) {
+  if (API_ENABLED) return api.post(`/admin/restaurants/${id}/reset-password`, { password });
+  return delay({ ok: true });
+}
+
+export async function setRestaurantOwnerStatus(id: string, active: boolean) {
+  if (API_ENABLED) return api.patch(`/admin/restaurants/${id}/owner-status`, { active });
+  return delay({ ok: true });
+}
+
 // ── Students ────────────────────────────────────────────────────────────
 export async function getStudents() {
   if (API_ENABLED) return api.get<AdminStudent[]>('/admin/students');

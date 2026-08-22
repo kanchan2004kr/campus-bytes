@@ -5,6 +5,7 @@ import type { FoodItem, MenuCategory } from '@campus-bytes/types';
 import { useEffect, useState } from 'react';
 import { Button, Field, Input, Modal, Select, Switch, Textarea, toast } from '@campus-bytes/ui';
 import { saveItem, type MenuItemInput } from '@/data/restaurant-menu';
+import { ImageUpload } from '@/components/shared/image-upload';
 
 export function MenuItemEditor({
   open,
@@ -128,14 +129,14 @@ export function MenuItemEditor({
           />
         </Field>
 
-        <Field label="Image URL" htmlFor="mi-img" hint="Cloudinary upload replaces this field in Phase 7.">
-          <Input
-            id="mi-img"
-            value={form.imageUrl ?? ''}
-            onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value || null }))}
-            placeholder="https://…"
+        <div className="max-w-[220px]">
+          <ImageUpload
+            label="Food image"
+            value={form.imageUrl}
+            onChange={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
+            aspect="square"
           />
-        </Field>
+        </div>
 
         <div className="flex items-center justify-between rounded-md border border-line px-3.5 py-3">
           <span className="text-sm font-medium text-ink-700">Vegetarian</span>

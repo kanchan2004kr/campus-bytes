@@ -3,9 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RestaurantStatus } from '@campus-bytes/types';
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import { Badge, Button, Skeleton, Table, THead, TBody, TR, TH, TD, ConfirmDialog, toast } from '@campus-bytes/ui';
 import { getRestaurants, setRestaurantStatus, type AdminRestaurant } from '@/data/admin';
 import { PageHeader } from '@/components/admin/page-header';
+import { CreateRestaurantModal } from '@/components/admin/create-restaurant-modal';
 import { formatCurrency } from '@/lib/format';
 
 const STATUS_TONE = {
@@ -18,6 +20,7 @@ export default function AdminRestaurantsPage() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ['admin-restaurants', 'all'], queryFn: () => getRestaurants() });
   const [confirm, setConfirm] = useState<{ r: AdminRestaurant; to: RestaurantStatus } | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const mut = useMutation({
     mutationFn: ({ id, status }: { id: string; status: RestaurantStatus }) => setRestaurantStatus(id, status),
@@ -30,7 +33,16 @@ export default function AdminRestaurantsPage() {
 
   return (
     <div>
-      <PageHeader title="Restaurants" description="Manage all campus outlets. Suspension hides them from students instantly." />
+      <PageHeader
+        title="Restaurants"
+        description="Manage all campus outlets. Suspension hides them from students instantly."
+        action={
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" /> New restaurant
+          </Button>
+        }
+      />
+      <CreateRestaurantModal open={createOpen} onClose={() => setCreateOpen(false)} />
 
       <div className="rounded-lg border border-line bg-surface shadow-sm">
         {isLoading ? (
