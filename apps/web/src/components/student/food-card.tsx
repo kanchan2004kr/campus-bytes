@@ -1,7 +1,7 @@
 'use client';
 
 import type { FoodItem } from '@campus-bytes/types';
-import { Plus } from 'lucide-react';
+import { Plus, UtensilsCrossed } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { Button, ConfirmDialog, QuantityStepper, VegMark, cn, toast } from '@campus-bytes/ui';
@@ -39,8 +39,12 @@ export function FoodCard({ item, restaurantName }: { item: FoodItem; restaurantN
 
         <div className="relative shrink-0">
           <div className="relative h-24 w-24 overflow-hidden rounded-md bg-surface-cream">
-            {item.imageUrl && (
-              <Image src={item.imageUrl} alt={item.name} fill sizes="96px" className="object-cover" />
+            {item.imageUrl ? (
+              <Image src={item.imageUrl} alt={item.name} fill sizes="96px" loading="lazy" className="object-cover" />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-ink-300">
+                <UtensilsCrossed className="h-8 w-8" />
+              </div>
             )}
             {!item.isAvailable && (
               <div className="absolute inset-0 flex items-center justify-center bg-ink-900/50">
