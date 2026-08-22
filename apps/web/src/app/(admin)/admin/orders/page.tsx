@@ -7,12 +7,16 @@ import { Skeleton, StatusPill, Table, THead, TBody, TR, TH, TD, cn } from '@camp
 import { getLiveOrders } from '@/data/admin';
 import { PageHeader } from '@/components/admin/page-header';
 import { formatCurrency } from '@/lib/format';
+import { useOrderRealtime } from '@/lib/realtime';
 
 export default function AdminLiveOrdersPage() {
+  // Real-time: the admin socket joins `admin:live` and receives every ORDER_*
+  // event → instant refetch. The 20s poll is only a reconnect fallback.
+  useOrderRealtime([['admin-live']]);
   const { data, isLoading } = useQuery({
     queryKey: ['admin-live'],
     queryFn: getLiveOrders,
-    refetchInterval: 5000,
+    refetchInterval: 20000,
   });
 
   const breaches = (data ?? []).filter((o) => o.slaBreach).length;

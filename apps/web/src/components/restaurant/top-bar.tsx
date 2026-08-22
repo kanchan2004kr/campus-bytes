@@ -42,16 +42,20 @@ export function RestaurantTopBar() {
       </div>
 
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => simulateMut.mutate()}
-          loading={simulateMut.isPending}
-          className="hidden text-ink-600 sm:inline-flex"
-          title="Demo: simulate an incoming order (replaced by realtime push in Phase 11)"
-        >
-          <BellPlus className="h-4 w-4" /> Simulate order
-        </Button>
+        {/* Dev-only demo affordance — hidden in production (real orders arrive via
+            the realtime socket). */}
+        {process.env.NODE_ENV !== 'production' && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => simulateMut.mutate()}
+            loading={simulateMut.isPending}
+            className="hidden text-ink-600 sm:inline-flex"
+            title="Demo only: simulate an incoming order"
+          >
+            <BellPlus className="h-4 w-4" /> Simulate order
+          </Button>
+        )}
 
         <div className="flex items-center gap-2 rounded-pill border border-line bg-surface px-3 py-1.5">
           <span
