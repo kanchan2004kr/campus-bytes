@@ -45,19 +45,42 @@ export class AdminService {
       status: st,
       count: liveOrders.filter((o) => o.status === st).length,
     }));
+
+    // Real order distribution across the day (2-hour buckets), from actual orders.
+    const allOrders = [...delivered, ...liveOrders];
+    const buckets: { label: string; from: number; to: number }[] = [
+      { label: '8a', from: 8, to: 10 }, { label: '10a', from: 10, to: 12 },
+      { label: '12p', from: 12, to: 14 }, { label: '2p', from: 14, to: 16 },
+      { label: '4p', from: 16, to: 18 }, { label: '6p', from: 18, to: 20 },
+      { label: '8p', from: 20, to: 22 }, { label: '10p', from: 22, to: 24 },
+    ];
+    const peakHours = buckets.map((b) => ({
+      label: b.label,
+      value: allOrders.filter((o) => {
+        const h = new Date(o.placedAt).getHours();
+        return h >= b.from && h < b.to;
+      }).length,
+    }));
+
+    // Real average delivery time from delivered orders (placed → last update).
+    const avgDeliveryMin = delivered.length
+      ? Math.round(
+          delivered.reduce(
+            (s, o) => s + Math.max(0, (o.updatedAt.getTime() - o.placedAt.getTime()) / 60000),
+            0,
+          ) / delivered.length,
+        )
+      : 0;
+
     return {
       todaysOrders: delivered.length + liveOrders.length,
       todaysRevenue: revenue,
       activeRestaurants: restaurants.filter((r) => r.status === RestaurantStatus.APPROVED).length,
       activeCarts: carts.filter((c) => c.status !== CartStatus.OFFLINE).length,
-      avgDeliveryMin: 21,
+      avgDeliveryMin,
       pendingApprovals: pending,
       openTickets: tickets,
-      peakHours: [
-        { label: '8a', value: 22 }, { label: '10a', value: 41 }, { label: '12p', value: 96 },
-        { label: '2p', value: 63 }, { label: '4p', value: 38 }, { label: '6p', value: 57 },
-        { label: '8p', value: 108 }, { label: '10p', value: 74 },
-      ],
+      peakHours,
       statusDist,
     };
   }
