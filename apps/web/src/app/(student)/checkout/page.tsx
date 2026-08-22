@@ -10,6 +10,7 @@ import { getStudentProfile } from '@/data/client';
 import { useCartStore } from '@/stores/cart-store';
 import { formatCurrency } from '@/lib/format';
 import { startCheckout } from '@/lib/payment';
+import { OrderSuccess, type SuccessOrder } from '@/components/student/order-success';
 
 const DELIVERY_FEE = 20;
 
@@ -23,10 +24,12 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { lines, restaurantName, restaurantId, notes } = useCartStore();
   const itemTotal = useCartStore((s) => s.itemTotal());
+  const clearCart = useCartStore((s) => s.clear);
   const [submitting, setSubmitting] = useState(false);
+  const [successOrder, setSuccessOrder] = useState<SuccessOrder | null>(null);
   const { data: profile } = useQuery({ queryKey: ['student-profile'], queryFn: getStudentProfile });
 
-  if (lines.length === 0) {
+  if (lines.length === 0 && !successOrder) {
     return (
       <div className="p-6">
         <EmptyState title="Nothing to check out" description="Your cart is empty." />
@@ -65,15 +68,29 @@ export default function CheckoutPage() {
         return;
       }
       if (result.status === 'failed') {
-        toast({ tone: 'error', title: 'Payment failed', description: result.reason });
+        toast({ tone: 'error', title: 'Order failed', description: result.reason });
         return;
       }
-      // Real flow (Phase 10): only navigate once the webhook-verified order exists.
-      router.push(`/orders/${result.orderCode}`);
+      // Backend confirmed the order — show the success experience (+ chime), then
+      // clear the cart. Navigation happens when the student taps "Track your order".
+      setSuccessOrder({
+        code: result.orderCode,
+        restaurantName: restaurantName ?? 'Restaurant',
+        items: lines.map((l) => ({ name: l.name, quantity: l.quantity, price: l.price })),
+        total,
+        location: loc,
+      });
+      clearCart();
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (successOrder) {
+    return (
+      <OrderSuccess order={successOrder} onTrack={() => router.push(`/orders/${successOrder.code}`)} />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-40 pt-4 md:px-6">
