@@ -29,6 +29,11 @@ interface UploadedImage {
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const FOLDER_RE = /^[a-zA-Z0-9/_-]+$/;
+// 1x1 transparent PNG — used only by the self-test to exercise the real signing path.
+const PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);
 
 /**
  * Server-side image uploads. The browser sends the actual file (multipart/form-data)
@@ -52,45 +57,16 @@ export class UploadsController {
   }
 
   /**
-   * Public diagnostic: reports WHICH Cloudinary env vars are present on the server
-   * (booleans only — never the values). Lets us confirm Render configuration without
-   * leaking secrets. Safe to keep in production.
+   * Signs and POSTs a buffer to Cloudinary using the server's API secret. Shared by the
+   * real upload route and the self-test so both exercise the identical signing path.
+   * Returns the secure URL, or throws with Cloudinary's exact error.
    */
-  @Public()
-  @Get('config-status')
-  configStatus() {
-    const { cloudName, apiKey, apiSecret } = this.cloudinaryEnv();
-    const rawSecret = process.env.CLOUDINARY_API_SECRET;
-    return {
-      configured: Boolean(cloudName && apiKey && apiSecret),
-      vars: {
-        CLOUDINARY_CLOUD_NAME: Boolean(cloudName),
-        CLOUDINARY_API_KEY: Boolean(apiKey),
-        CLOUDINARY_API_SECRET: Boolean(apiSecret),
-      },
-      // Booleans only — never the secret value. Confirms the whitespace root cause.
-      secretHadSurroundingWhitespace: Boolean(rawSecret && rawSecret !== rawSecret.trim()),
-    };
-  }
-
-  @Roles(UserRole.RESTAURANT, UserRole.ADMIN)
-  @Post('image')
-  @HttpCode(200)
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_BYTES } }))
-  async uploadImage(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [new MaxFileSizeValidator({ maxSize: MAX_BYTES })],
-        fileIsRequired: true,
-      }),
-    )
-    file: UploadedImage,
-    @Query('folder') folderRaw?: string,
-  ): Promise<{ url: string }> {
-    if (!ALLOWED_MIME.has(file.mimetype)) {
-      throw new BadRequestException('Please choose a JPG, PNG or WEBP image.');
-    }
-
+  private async uploadBuffer(
+    buffer: Buffer,
+    mimetype: string,
+    filename: string,
+    folderRaw?: string,
+  ): Promise<string> {
     const { cloudName, apiKey, apiSecret } = this.cloudinaryEnv();
     const missing = [
       !cloudName && 'CLOUDINARY_CLOUD_NAME',
@@ -98,7 +74,6 @@ export class UploadsController {
       !apiSecret && 'CLOUDINARY_API_SECRET',
     ].filter(Boolean) as string[];
     if (missing.length) {
-      // Server-side log names the exact missing var(s) for ops; client sees a generic hint.
       this.logger.error(`Cloudinary not configured — missing env: ${missing.join(', ')}`);
       throw new ServiceUnavailableException(
         `Image upload is not configured on the server (missing: ${missing.join(', ')}).`,
@@ -114,17 +89,14 @@ export class UploadsController {
     // Log ONLY the signed params (never the secret or signature).
     this.logger.log(`Signing Cloudinary upload — folder=${folder}, timestamp=${timestamp}`);
     // Cloudinary signature: sha1 of the sorted "k=v&k=v" signed params + api secret.
-    // (api_key and signature itself are NOT part of the string-to-sign.)
+    // The signed set here is exactly {folder, timestamp}. api_key and signature itself
+    // are NOT part of the string-to-sign.
     const signature = createHash('sha1')
       .update(`folder=${folder}&timestamp=${timestamp}${apiSecret}`)
       .digest('hex');
 
     const form = new FormData();
-    form.append(
-      'file',
-      new Blob([new Uint8Array(file.buffer)], { type: file.mimetype }),
-      file.originalname,
-    );
+    form.append('file', new Blob([new Uint8Array(buffer)], { type: mimetype }), filename);
     form.append('api_key', apiKey!);
     form.append('timestamp', String(timestamp));
     form.append('folder', folder);
@@ -151,7 +123,68 @@ export class UploadsController {
       throw new BadRequestException(`Image upload failed: ${detail}`);
     }
 
-    this.logger.log(`Uploaded ${file.originalname} (${file.size}B) → ${data.secure_url}`);
-    return { url: data.secure_url };
+    this.logger.log(`Uploaded ${filename} (${buffer.length}B) → ${data.secure_url}`);
+    return data.secure_url;
+  }
+
+  /**
+   * Public diagnostic: reports WHICH Cloudinary env vars are present on the server
+   * (booleans only — never the values). Lets us confirm Render configuration without
+   * leaking secrets. Safe to keep in production.
+   */
+  @Public()
+  @Get('config-status')
+  configStatus() {
+    const { cloudName, apiKey, apiSecret } = this.cloudinaryEnv();
+    const rawSecret = process.env.CLOUDINARY_API_SECRET;
+    return {
+      configured: Boolean(cloudName && apiKey && apiSecret),
+      vars: {
+        CLOUDINARY_CLOUD_NAME: Boolean(cloudName),
+        CLOUDINARY_API_KEY: Boolean(apiKey),
+        CLOUDINARY_API_SECRET: Boolean(apiSecret),
+      },
+      // Booleans only — never the secret value.
+      secretHadSurroundingWhitespace: Boolean(rawSecret && rawSecret !== rawSecret.trim()),
+    };
+  }
+
+  /**
+   * Public self-test: signs + uploads a 1x1 PNG using the SERVER's real Cloudinary
+   * secret, exercising the exact signing path. Lets us verify the deployed secret
+   * end-to-end without a login token. Returns Cloudinary's exact error on failure
+   * (e.g. "Invalid Signature" ⇒ the CLOUDINARY_API_SECRET value is wrong).
+   */
+  @Public()
+  @Post('self-test')
+  @HttpCode(200)
+  async selfTest(): Promise<{ ok: boolean; url?: string; error?: string }> {
+    try {
+      const url = await this.uploadBuffer(PIXEL_PNG, 'image/png', 'selftest.png', 'campusbytes/_selftest');
+      return { ok: true, url };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'Upload failed.' };
+    }
+  }
+
+  @Roles(UserRole.RESTAURANT, UserRole.ADMIN)
+  @Post('image')
+  @HttpCode(200)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_BYTES } }))
+  async uploadImage(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [new MaxFileSizeValidator({ maxSize: MAX_BYTES })],
+        fileIsRequired: true,
+      }),
+    )
+    file: UploadedImage,
+    @Query('folder') folderRaw?: string,
+  ): Promise<{ url: string }> {
+    if (!ALLOWED_MIME.has(file.mimetype)) {
+      throw new BadRequestException('Please choose a JPG, PNG or WEBP image.');
+    }
+    const url = await this.uploadBuffer(file.buffer, file.mimetype, file.originalname, folderRaw);
+    return { url };
   }
 }
