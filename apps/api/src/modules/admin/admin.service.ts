@@ -156,9 +156,65 @@ export class AdminService {
   }
 
   // ── Approved-student roster (registration source of truth) ──────────
+  private async registeredStudentIdSet(campusId: string): Promise<Set<string>> {
+    const users = await this.prisma.user.findMany({
+      where: { campusId, role: UserRole.STUDENT, verified: true, studentId: { not: null } },
+      select: { studentId: true },
+    });
+    return new Set(users.map((u) => (u.studentId ?? '').toUpperCase()));
+  }
+
   async approvedStudentsCount(campusId: string) {
     const total = await this.prisma.approvedStudent.count({ where: { campusId } });
-    return { total };
+    const registeredSet = await this.registeredStudentIdSet(campusId);
+    const registered = registeredSet.size
+      ? await this.prisma.approvedStudent.count({
+          where: { campusId, studentId: { in: [...registeredSet] } },
+        })
+      : 0;
+    return { total, registered, notRegistered: total - registered };
+  }
+
+  /** Searchable, paginated roster with per-row registered status. */
+  async approvedStudents(campusId: string, query?: string, limit = 50, offset = 0) {
+    const q = (query ?? '').trim();
+    const where = {
+      campusId,
+      ...(q
+        ? {
+            OR: [
+              { studentId: { contains: q.toUpperCase() } },
+              { name: { contains: q, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+    const [total, registeredSet, matched, rows] = await Promise.all([
+      this.prisma.approvedStudent.count({ where: { campusId } }),
+      this.registeredStudentIdSet(campusId),
+      this.prisma.approvedStudent.count({ where }),
+      this.prisma.approvedStudent.findMany({
+        where,
+        orderBy: { studentId: 'asc' },
+        take: Math.min(limit, 200),
+        skip: offset,
+      }),
+    ]);
+    const registered = registeredSet.size
+      ? await this.prisma.approvedStudent.count({ where: { campusId, studentId: { in: [...registeredSet] } } })
+      : 0;
+    return {
+      total,
+      registered,
+      notRegistered: total - registered,
+      matched,
+      rows: rows.map((r) => ({
+        studentId: r.studentId,
+        name: r.name,
+        registered: registeredSet.has(r.studentId.toUpperCase()),
+        createdAt: r.createdAt.toISOString(),
+      })),
+    };
   }
 
   /**

@@ -134,6 +134,16 @@ export class AdminController {
     return this.admin.approvedStudentsCount(u.campusId);
   }
 
+  @Get('approved-students')
+  approvedStudents(
+    @CurrentUser() u: AuthUser,
+    @Query('query') query?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.admin.approvedStudents(u.campusId, query, limit ? Number(limit) : 50, offset ? Number(offset) : 0);
+  }
+
   @Post('approved-students/import')
   @HttpCode(200)
   importApprovedStudents(@CurrentUser() u: AuthUser, @Body() dto: ImportApprovedStudentsDto) {

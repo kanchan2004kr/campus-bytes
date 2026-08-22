@@ -12,6 +12,7 @@ import {
   LifeBuoy,
   Settings,
   ScrollText,
+  GraduationCap,
 } from 'lucide-react';
 import type { NavItem } from '@/components/dashboard/sidebar';
 
@@ -19,6 +20,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/approvals', label: 'Restaurant Approvals', icon: ClipboardCheck },
   { href: '/admin/restaurants', label: 'Restaurants', icon: Store },
+  { href: '/admin/approved-students', label: 'Approved Students', icon: GraduationCap },
   { href: '/admin/students', label: 'Students', icon: Users },
   { href: '/admin/carts', label: 'Campus Carts', icon: Truck },
   { href: '/admin/zones', label: 'Hostels & Zones', icon: Building2 },

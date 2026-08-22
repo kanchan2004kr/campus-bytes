@@ -351,6 +351,44 @@ export async function createRestaurantOwner(id: string, input: { ownerEmail: str
   return delay({ id, name: '', ownerEmail: input.ownerEmail });
 }
 
+// ── Approved students (registration roster) ──────────────────────────
+export interface ApprovedStudentRow {
+  studentId: string;
+  name: string;
+  registered: boolean;
+  createdAt: string;
+}
+export interface ApprovedStudentsResponse {
+  total: number;
+  registered: number;
+  notRegistered: number;
+  matched: number;
+  rows: ApprovedStudentRow[];
+}
+
+export async function getApprovedStudents(query = ''): Promise<ApprovedStudentsResponse> {
+  if (API_ENABLED) {
+    const qs = query.trim() ? `?query=${encodeURIComponent(query.trim())}` : '';
+    return api.get<ApprovedStudentsResponse>(`/admin/approved-students${qs}`);
+  }
+  return delay({ total: 0, registered: 0, notRegistered: 0, matched: 0, rows: [] });
+}
+
+export interface ImportApprovedResult {
+  received: number;
+  valid: number;
+  inserted: number;
+  updated: number;
+  duplicates: number;
+  invalid: number;
+  sampleInvalid: string[];
+  total: number;
+}
+export async function importApprovedStudents(csv: string): Promise<ImportApprovedResult> {
+  if (API_ENABLED) return api.post<ImportApprovedResult>('/admin/approved-students/import', { csv });
+  return delay({ received: 0, valid: 0, inserted: 0, updated: 0, duplicates: 0, invalid: 0, sampleInvalid: [], total: 0 });
+}
+
 export async function resetRestaurantPassword(id: string, password: string) {
   if (API_ENABLED) return api.post(`/admin/restaurants/${id}/reset-password`, { password });
   return delay({ ok: true });
